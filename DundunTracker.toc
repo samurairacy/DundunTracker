@@ -1,0 +1,8 @@
+## Interface: 120001
+## Title: Dundun Tracker
+## Notes: Tracks Shard of Dundun (weekly & total caps) across all characters on account.
+## Author: Parmenides-Khaz'goroth
+## Version: 1.0.0
+## SavedVariables: DundunTrackerDB
+
+DundunTracker.lua

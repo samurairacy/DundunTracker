@@ -1,0 +1,6 @@
+package-as: DundunTracker
+
+ignore:
+  - .pkgmeta
+  - .github
+  - README.md
