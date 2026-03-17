@@ -327,7 +327,7 @@ function DundunTracker_RefreshWindow()
 
     -- Compute the start of the current reset week using the game's own API.
     -- Any alt whose lastSaved predates this is carrying last-week's data.
-    local nextReset = GetWeeklyQuestResetTime()
+    local nextReset = GetServerTime() + C_DateAndTime.GetSecondsUntilWeeklyReset()
     local weekStart = nextReset - (7 * 24 * 3600)
 
     local sorted = {}
@@ -482,7 +482,7 @@ SlashCmdList["DUNDUN"] = function(msg)
         else
             print("  nil — currency not found for ID " .. CURRENCY_ID)
         end
-        local dbgNextReset = GetWeeklyQuestResetTime()
+        local dbgNextReset = GetServerTime() + C_DateAndTime.GetSecondsUntilWeeklyReset()
         local dbgWeekStart = dbgNextReset - (7 * 24 * 3600)
         local dbgNow       = GetServerTime()
         print(string.format(
