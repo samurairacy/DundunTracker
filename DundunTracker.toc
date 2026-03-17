@@ -2,7 +2,7 @@
 ## Title: Dundun Tracker
 ## Notes: Tracks Shard of Dundun (weekly & total caps) across all characters on account.
 ## Author: Parmenides-Khaz'goroth
-## Version: 1.0.0
+## Version: @project-version@
 ## SavedVariables: DundunTrackerDB
 ## X-Curse-Project-ID: 1488331
 
