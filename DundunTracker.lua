@@ -325,7 +325,10 @@ function DundunTracker_RefreshWindow()
 
     local currentKey = GetCharKey()
 
-    local lastReset = DundunTrackerDB._lastResetTime
+    -- Compute the start of the current reset week using the game's own API.
+    -- Any alt whose lastSaved predates this is carrying last-week's data.
+    local nextReset = GetWeeklyQuestResetTime()
+    local weekStart = nextReset - (7 * 24 * 3600)
 
     local sorted = {}
     for k, v in pairs(DundunTrackerDB) do
@@ -357,11 +360,10 @@ function DundunTracker_RefreshWindow()
         local prefix = isCurrent and "|cffFFFFFF>|r " or "  "
         row.nameText:SetText(prefix .. ClassColor(d.class or "") .. (d.name or "?") .. "|r")
 
-        -- If a reset has been observed and this alt's data pre-dates it, show 0.
+        -- Alt data saved before this week's reset boundary is stale; show 0.
         local stale = not isCurrent
-                      and lastReset
                       and d.lastSaved
-                      and d.lastSaved < lastReset
+                      and d.lastSaved < weekStart
         local we = stale and 0 or (d.weeklyEarned or 0)
         local wc = d.weeklyCap or WEEKLY_CAP
         local wr, wg, wb = FractionColor(we, wc)
@@ -480,18 +482,22 @@ SlashCmdList["DUNDUN"] = function(msg)
         else
             print("  nil — currency not found for ID " .. CURRENCY_ID)
         end
+        local dbgNextReset = GetWeeklyQuestResetTime()
+        local dbgWeekStart = dbgNextReset - (7 * 24 * 3600)
+        local dbgNow       = GetServerTime()
+        print(string.format(
+            "|cffcc88ffDunDun Tracker:|r now=|cffFFFF00%d|r  weekStart=|cffFFFF00%d|r  nextReset=|cffFFFF00%d|r  secsUntilReset=|cffFFFF00%d|r",
+            dbgNow, dbgWeekStart, dbgNextReset, dbgNextReset - dbgNow))
         print("|cffcc88ffDunDun Tracker:|r DB state:")
         local count = 0
         if DundunTrackerDB then
-            if DundunTrackerDB._lastResetTime then
-                print("  |cffFFFF00_lastResetTime|r = " .. tostring(DundunTrackerDB._lastResetTime))
-            end
             for k, v in pairs(DundunTrackerDB) do
                 if type(v) == "table" then
                     count = count + 1
-                    print(string.format("  |cffFFFF00%s|r => qty=%s weekly=%s lastSaved=%s",
+                    local staleFlag = (v.lastSaved and v.lastSaved < dbgWeekStart) and "|cffFF4444STALE|r" or "|cff44FF44fresh|r"
+                    print(string.format("  |cffFFFF00%s|r => qty=%s weekly=%s lastSaved=%s [%s]",
                         tostring(k), tostring(v.quantity), tostring(v.weeklyEarned),
-                        tostring(v.lastSaved)))
+                        tostring(v.lastSaved), staleFlag))
                 end
             end
         end
