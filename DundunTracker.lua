@@ -41,7 +41,11 @@ end
 --     weeklyEarned = 5,
 --     weeklyCap    = 8,
 --     totalCap     = 8,
+--     lastSaved    = <unix timestamp>,   -- set every time SaveCurrentChar runs
 -- }
+-- DundunTrackerDB._lastResetTime = <unix timestamp>
+--     Set whenever the current character's weeklyEarned drops, indicating a
+--     weekly reset occurred. Used to zero out stale alt data in the UI.
 
 -- ============================================================
 --  Helpers
@@ -83,15 +87,24 @@ local function SaveCurrentChar()
     local totalCap  = (info.maxQuantity and info.maxQuantity > 0)
                       and info.maxQuantity or TOTAL_CAP
 
-    local key = GetCharKey()
+    local key            = GetCharKey()
+    local newWeeklyEarned = info.quantityEarnedThisWeek or 0
+
+    -- If weekly earned dropped from last save, a reset occurred — record it.
+    local prev = DundunTrackerDB[key]
+    if prev and (prev.weeklyEarned or 0) > newWeeklyEarned then
+        DundunTrackerDB._lastResetTime = GetServerTime()
+    end
+
     DundunTrackerDB[key] = {
         name         = UnitName("player"),
         realm        = GetRealmName(),
         class        = select(2, UnitClass("player")),
         quantity     = info.quantity or 0,
-        weeklyEarned = info.quantityEarnedThisWeek or 0,
+        weeklyEarned = newWeeklyEarned,
         weeklyCap    = weeklyCap,
         totalCap     = totalCap,
+        lastSaved    = GetServerTime(),
     }
 end
 
@@ -312,9 +325,13 @@ function DundunTracker_RefreshWindow()
 
     local currentKey = GetCharKey()
 
+    local lastReset = DundunTrackerDB._lastResetTime
+
     local sorted = {}
     for k, v in pairs(DundunTrackerDB) do
-        table.insert(sorted, { key = k, data = v })
+        if type(v) == "table" then
+            table.insert(sorted, { key = k, data = v })
+        end
     end
     table.sort(sorted, function(a, b)
         if a.key == currentKey then return true  end
@@ -340,8 +357,13 @@ function DundunTracker_RefreshWindow()
         local prefix = isCurrent and "|cffFFFFFF>|r " or "  "
         row.nameText:SetText(prefix .. ClassColor(d.class or "") .. (d.name or "?") .. "|r")
 
-        local we = d.weeklyEarned or 0
-        local wc = d.weeklyCap    or WEEKLY_CAP
+        -- If a reset has been observed and this alt's data pre-dates it, show 0.
+        local stale = not isCurrent
+                      and lastReset
+                      and d.lastSaved
+                      and d.lastSaved < lastReset
+        local we = stale and 0 or (d.weeklyEarned or 0)
+        local wc = d.weeklyCap or WEEKLY_CAP
         local wr, wg, wb = FractionColor(we, wc)
         row.weeklyText:SetText(string.format("|cff%02x%02x%02x%d / %d|r",
             wr*255, wg*255, wb*255, we, wc))
@@ -363,7 +385,9 @@ end
 local function AutoSizeWindow()
     if not DundunTrackerDB then return end
     local count = 0
-    for _ in pairs(DundunTrackerDB) do count = count + 1 end
+    for _, v in pairs(DundunTrackerDB) do
+        if type(v) == "table" then count = count + 1 end
+    end
     if count == 0 then return end
     -- Fixed vertical overhead: top inset + title bar + gap + quote bar + gap + header + gap
     local scrollTop = (6 + TITLE_BAR_H + 4) + QUOTE_H + 3 + HEADER_H + 2
@@ -407,7 +431,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
 
         -- Startup diagnostic: tells us how many chars were loaded from disk
         local count = 0
-        for _ in pairs(DundunTrackerDB) do count = count + 1 end
+        for _, v in pairs(DundunTrackerDB) do
+            if type(v) == "table" then count = count + 1 end
+        end
         if count > 0 then
             print(string.format(
                 "|cffcc88ffDunDun Tracker|r loaded — found |cffFFFF00%d|r saved character(s) from disk.",
@@ -457,10 +483,16 @@ SlashCmdList["DUNDUN"] = function(msg)
         print("|cffcc88ffDunDun Tracker:|r DB state:")
         local count = 0
         if DundunTrackerDB then
+            if DundunTrackerDB._lastResetTime then
+                print("  |cffFFFF00_lastResetTime|r = " .. tostring(DundunTrackerDB._lastResetTime))
+            end
             for k, v in pairs(DundunTrackerDB) do
-                count = count + 1
-                print(string.format("  |cffFFFF00%s|r => qty=%s weekly=%s",
-                    tostring(k), tostring(v.quantity), tostring(v.weeklyEarned)))
+                if type(v) == "table" then
+                    count = count + 1
+                    print(string.format("  |cffFFFF00%s|r => qty=%s weekly=%s lastSaved=%s",
+                        tostring(k), tostring(v.quantity), tostring(v.weeklyEarned),
+                        tostring(v.lastSaved)))
+                end
             end
         end
         if count == 0 then print("  (empty)") end
