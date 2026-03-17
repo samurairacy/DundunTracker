@@ -107,7 +107,7 @@ local ROW_HEIGHT  = 22
 local HEADER_H    = 22
 local TITLE_BAR_H = 26
 local QUOTE_H     = 24
-local FOOTER_H    = 46
+local FOOTER_H    = 36
 local MIN_WIN_H   = 160
 
 -- ============================================================
@@ -274,17 +274,6 @@ local function CreateWindow()
     creditText:SetTextColor(0.4, 0.35, 0.5)
     creditText:SetText("Addon by Parmenides-Khaz'goroth; vibecoded using Claude Sonnet 4.6")
 
-    -- Buttons
-    local refreshBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    refreshBtn:SetSize(70, 20)
-    refreshBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 6)
-    refreshBtn:SetText("Refresh")
-    refreshBtn:SetScript("OnClick", function()
-        SaveCurrentChar()
-        DundunTracker_RefreshWindow()
-    end)
-
-
     -- Resize grip dots (bottom-right corner)
     local function GripDot(xOff, yOff)
         local d = f:CreateTexture(nil, "OVERLAY")
@@ -371,10 +360,22 @@ end
 --  Show / Toggle
 -- ============================================================
 
+local function AutoSizeWindow()
+    if not DundunTrackerDB then return end
+    local count = 0
+    for _ in pairs(DundunTrackerDB) do count = count + 1 end
+    if count == 0 then return end
+    -- Fixed vertical overhead: top inset + title bar + gap + quote bar + gap + header + gap
+    local scrollTop = (6 + TITLE_BAR_H + 4) + QUOTE_H + 3 + HEADER_H + 2
+    local idealH = scrollTop + FOOTER_H + (count * ROW_HEIGHT) + 8
+    window:SetHeight(math.max(idealH, MIN_WIN_H))
+end
+
 local function ShowWindow()
     if not window then
         window = CreateWindow()
     end
+    AutoSizeWindow()
     window.quoteText:SetText(GetNextQuote())
     SaveCurrentChar()
     window:Show()
@@ -443,15 +444,7 @@ SLASH_DUNDUN2 = "/ddt"
 SlashCmdList["DUNDUN"] = function(msg)
     local cmd = strtrim(msg):lower()
 
-    if cmd == "reset" then
-        local key = GetCharKey()
-        if DundunTrackerDB[key] then
-            DundunTrackerDB[key].weeklyEarned = 0
-        end
-        DundunTracker_RefreshWindow()
-        print("|cffcc88ffDunDun Tracker:|r Weekly reset for " .. UnitName("player"))
-
-    elseif cmd == "debug" then
+    if cmd == "debug" then
         local info = C_CurrencyInfo.GetCurrencyInfo(CURRENCY_ID)
         print("|cffcc88ffDunDun Tracker:|r Raw CurrencyInfo fields:")
         if info then
