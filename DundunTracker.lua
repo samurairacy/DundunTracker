@@ -164,7 +164,7 @@ local function CreateRow(parent, index)
 
     local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameText:SetPoint("LEFT", row, "LEFT", 6, 0)
-    nameText:SetWidth(COL_NAME - 8)
+    nameText:SetWordWrap(false)
     nameText:SetJustifyH("LEFT")
 
     local weeklyText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -334,9 +334,9 @@ local function CreateWindow()
         d:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", xOff, yOff)
         d:SetColorTexture(0.7, 0.5, 0.9, 0.8)
     end
-    GripDot(-3, 3);  GripDot(-7, 3);  GripDot(-11, 3)
-                     GripDot(-7, 7);  GripDot(-11, 7)
-                                      GripDot(-11, 11)
+    GripDot(-11, 3); GripDot(-7, 3);  GripDot(-3, 3)
+                     GripDot(-7, 7);  GripDot(-3, 7)
+                                      GripDot(-3, 11)
 
     local gripFrame = CreateFrame("Frame", nil, f)
     gripFrame:SetSize(18, 18)
@@ -554,7 +554,7 @@ local function CreateSettingsWindow()
     )
 
     -- Mode label + buttons
-    local MODE_TOP = INFO_TOP + 50
+    local MODE_TOP = INFO_TOP + 72
     local modeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     modeLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -MODE_TOP)
     modeLabel:SetText("List Mode:")
@@ -627,6 +627,7 @@ local function CreateSettingsWindow()
     f.listContent  = listContent
 
     tinsert(UISpecialFrames, "DundunTrackerSettingsWindow")
+    f:Hide()
     return f
 end
 
