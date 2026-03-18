@@ -488,7 +488,8 @@ local function RefreshSettingsWindow()
         end
         local d = entry.data
         cb.charKey = entry.key
-        cb.lbl:SetText(ClassColor(d.class or "") .. (d.name or "?") .. "|r")
+        local charLabel = (d.name or "?") .. (d.realm and ("-" .. d.realm) or "")
+        cb.lbl:SetText(ClassColor(d.class or "") .. charLabel .. "|r")
         cb:SetChecked(s.list[entry.key] == true)
         cb:Show()
     end
@@ -547,13 +548,12 @@ local function CreateSettingsWindow()
     infoText:SetJustifyH("LEFT")
     infoText:SetTextColor(0.65, 0.60, 0.75)
     infoText:SetText(
-        "All characters are always tracked in the database.\n" ..
         "|cffcc88ffWhitelist|r: only listed characters appear in the tracker.\n" ..
         "|cffcc88ffBlacklist|r: listed characters are hidden from the tracker."
     )
 
     -- Mode label + buttons
-    local MODE_TOP = INFO_TOP + 50
+    local MODE_TOP = INFO_TOP + 34
     local modeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     modeLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -MODE_TOP)
     modeLabel:SetText("List Mode:")
