@@ -228,10 +228,10 @@ local function CreateWindow()
     closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 4, 4)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
-    -- Settings (gear) button
+    -- Settings button
     local gearBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
-    gearBtn:SetSize(20, 20)
-    gearBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -26, 2)
+    gearBtn:SetSize(58, 20)
+    gearBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -30, 2)
     gearBtn:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -240,16 +240,10 @@ local function CreateWindow()
     })
     gearBtn:SetBackdropColor(0.12, 0.06, 0.20, 0.85)
     gearBtn:SetBackdropBorderColor(0.45, 0.25, 0.65, 0.8)
-    local gearIcon = gearBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    gearIcon:SetPoint("CENTER")
-    gearIcon:SetText("|cffaa88cc\226\154\153|r")  -- ⚙
+    local gearLabel = gearBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    gearLabel:SetPoint("CENTER")
+    gearLabel:SetText("|cffaa88ccSettings|r")
     gearBtn:SetScript("OnClick", function() ToggleSettingsWindow() end)
-    gearBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText("Settings", 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    gearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Quote bar
     local TOP_OFFSET = 6 + TITLE_BAR_H + 4
@@ -539,7 +533,7 @@ local function CreateSettingsWindow()
 
     local titleText = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleText:SetPoint("CENTER")
-    titleText:SetText("|cffcc88ff\226\154\153 DunDun Tracker \226\128\148 Settings|r")  -- ⚙ … —
+    titleText:SetText("|cffcc88ffDunDun Tracker - Settings|r")
 
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 4, 4)
@@ -635,7 +629,7 @@ local function CreateSettingsWindow()
     return f
 end
 
-local function ToggleSettingsWindow()
+ToggleSettingsWindow = function()
     if not settingsWindow then
         settingsWindow = CreateSettingsWindow()
     end
