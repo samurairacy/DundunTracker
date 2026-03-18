@@ -134,7 +134,7 @@ end
 --  Layout constants
 -- ============================================================
 
-local COL_NAME    = 170
+local COL_NAME    = 210
 local COL_WEEKLY  = 115
 local COL_TOTAL   = 115
 local WIN_WIDTH   = COL_NAME + COL_WEEKLY + COL_TOTAL + 32
@@ -398,7 +398,8 @@ function DundunTracker_RefreshWindow()
         local d = entry.data
         local isCurrent = (entry.key == currentKey)
         local prefix = isCurrent and "|cffFFFFFF>|r " or "  "
-        row.nameText:SetText(prefix .. ClassColor(d.class or "") .. (d.name or "?") .. "|r")
+        local nameLabel = (d.name or "?") .. (d.realm and ("-" .. d.realm) or "")
+        row.nameText:SetText(prefix .. ClassColor(d.class or "") .. nameLabel .. "|r")
 
         -- Alt data saved before this week's reset boundary is stale; show 0.
         local stale = not isCurrent
@@ -553,7 +554,7 @@ local function CreateSettingsWindow()
     )
 
     -- Mode label + buttons
-    local MODE_TOP = INFO_TOP + 34
+    local MODE_TOP = INFO_TOP + 50
     local modeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     modeLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -MODE_TOP)
     modeLabel:SetText("List Mode:")
