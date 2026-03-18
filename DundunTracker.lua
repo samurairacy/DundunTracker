@@ -109,6 +109,28 @@ local function SaveCurrentChar()
 end
 
 -- ============================================================
+--  Settings helpers
+-- ============================================================
+
+local function GetSettings()
+    if not DundunTrackerDB then return { listMode = "none", list = {} } end
+    if not DundunTrackerDB._settings then
+        DundunTrackerDB._settings = { listMode = "none", list = {} }
+    end
+    return DundunTrackerDB._settings
+end
+
+local function IsCharVisible(key)
+    local s = GetSettings()
+    if s.listMode == "whitelist" then
+        return s.list[key] == true
+    elseif s.listMode == "blacklist" then
+        return not s.list[key]
+    end
+    return true
+end
+
+-- ============================================================
 --  Layout constants
 -- ============================================================
 
@@ -120,7 +142,7 @@ local ROW_HEIGHT  = 22
 local HEADER_H    = 22
 local TITLE_BAR_H = 26
 local QUOTE_H     = 24
-local FOOTER_H    = 36
+local FOOTER_H    = 48
 local MIN_WIN_H   = 160
 
 -- ============================================================
@@ -205,6 +227,29 @@ local function CreateWindow()
     closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 4, 4)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
+    -- Settings (gear) button
+    local gearBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
+    gearBtn:SetSize(20, 20)
+    gearBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -26, 2)
+    gearBtn:SetBackdrop({
+        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 6,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    gearBtn:SetBackdropColor(0.12, 0.06, 0.20, 0.85)
+    gearBtn:SetBackdropBorderColor(0.45, 0.25, 0.65, 0.8)
+    local gearIcon = gearBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    gearIcon:SetPoint("CENTER")
+    gearIcon:SetText("|cffaa88cc\226\154\153|r")  -- ⚙
+    gearBtn:SetScript("OnClick", function() ToggleSettingsWindow() end)
+    gearBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetText("Settings", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    gearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     -- Quote bar
     local TOP_OFFSET = 6 + TITLE_BAR_H + 4
     local quoteBar = CreateFrame("Frame", nil, f, "BackdropTemplate")
@@ -281,8 +326,8 @@ local function CreateWindow()
 
     -- Credit text
     local creditText = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    creditText:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  12, 28)
-    creditText:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 28)
+    creditText:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  12, 12)
+    creditText:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 12)
     creditText:SetJustifyH("LEFT")
     creditText:SetTextColor(0.4, 0.35, 0.5)
     creditText:SetText("Addon by Parmenides-Khaz'goroth; vibecoded using Claude Sonnet 4.6")
@@ -332,7 +377,7 @@ function DundunTracker_RefreshWindow()
 
     local sorted = {}
     for k, v in pairs(DundunTrackerDB) do
-        if type(v) == "table" then
+        if type(v) == "table" and IsCharVisible(k) then
             table.insert(sorted, { key = k, data = v })
         end
     end
@@ -381,14 +426,235 @@ function DundunTracker_RefreshWindow()
 end
 
 -- ============================================================
+--  Settings window
+-- ============================================================
+
+local settingsWindow
+
+local function RefreshSettingsWindow()
+    if not settingsWindow then return end
+    local s = GetSettings()
+
+    -- Highlight the active mode button
+    for _, btn in ipairs(settingsWindow.modeBtns) do
+        local active = (btn.mode == s.listMode)
+        if active then
+            btn:SetBackdropColor(0.25, 0.12, 0.40, 0.95)
+            btn:SetBackdropBorderColor(0.7, 0.4, 1.0, 1)
+            btn.label:SetTextColor(0.95, 0.80, 1.0)
+        else
+            btn:SetBackdropColor(0.08, 0.04, 0.14, 0.85)
+            btn:SetBackdropBorderColor(0.35, 0.20, 0.50, 0.7)
+            btn.label:SetTextColor(0.55, 0.50, 0.65)
+        end
+    end
+
+    local hasMode = s.listMode ~= "none"
+    settingsWindow.noModeLabel:SetShown(not hasMode)
+    settingsWindow.listScroll:SetShown(hasMode)
+    if not hasMode then return end
+
+    -- Rebuild checkboxes
+    local listContent = settingsWindow.listContent
+    for _, cb in ipairs(listContent.checkboxes) do cb:Hide() end
+
+    local sorted = {}
+    if DundunTrackerDB then
+        for k, v in pairs(DundunTrackerDB) do
+            if type(v) == "table" then
+                table.insert(sorted, { key = k, data = v })
+            end
+        end
+    end
+    table.sort(sorted, function(a, b)
+        return (a.data.name or "") < (b.data.name or "")
+    end)
+
+    local CBH = 22
+    for i, entry in ipairs(sorted) do
+        local cb = listContent.checkboxes[i]
+        if not cb then
+            cb = CreateFrame("CheckButton", nil, listContent, "UICheckButtonTemplate")
+            cb:SetSize(22, 22)
+            cb:SetPoint("TOPLEFT", listContent, "TOPLEFT", 4, -(i - 1) * CBH - 2)
+            local lbl = cb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+            cb.lbl = lbl
+            cb:SetScript("OnClick", function(self)
+                local settings = GetSettings()
+                if self:GetChecked() then
+                    settings.list[self.charKey] = true
+                else
+                    settings.list[self.charKey] = nil
+                end
+                DundunTracker_RefreshWindow()
+            end)
+            listContent.checkboxes[i] = cb
+        end
+        local d = entry.data
+        cb.charKey = entry.key
+        cb.lbl:SetText(ClassColor(d.class or "") .. (d.name or "?") .. "|r")
+        cb:SetChecked(s.list[entry.key] == true)
+        cb:Show()
+    end
+    listContent:SetHeight(math.max(#sorted * CBH + 4, CBH))
+end
+
+local function CreateSettingsWindow()
+    local SW = 300
+    local f = CreateFrame("Frame", "DundunTrackerSettingsWindow", UIParent, "BackdropTemplate")
+    f:SetSize(SW, 360)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("HIGH")
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop",  f.StopMovingOrSizing)
+    f:SetClampedToScreen(true)
+
+    f:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 24,
+        insets = { left = 6, right = 6, top = 6, bottom = 6 },
+    })
+    f:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
+    f:SetBackdropBorderColor(0.4, 0.35, 0.55, 1)
+
+    -- Title bar
+    local titleBar = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",   8, -6)
+    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT",  -8, -6)
+    titleBar:SetHeight(TITLE_BAR_H)
+    titleBar:SetBackdrop({
+        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 10,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    titleBar:SetBackdropColor(0.18, 0.10, 0.30, 0.95)
+    titleBar:SetBackdropBorderColor(0.55, 0.30, 0.75, 1)
+
+    local titleText = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    titleText:SetPoint("CENTER")
+    titleText:SetText("|cffcc88ff\226\154\153 DunDun Tracker \226\128\148 Settings|r")  -- ⚙ … —
+
+    local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 4, 4)
+    closeBtn:SetScript("OnClick", function() f:Hide() end)
+
+    -- Info text
+    local INFO_TOP = 6 + TITLE_BAR_H + 10
+    local infoText = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    infoText:SetPoint("TOPLEFT",  f, "TOPLEFT",  14, -INFO_TOP)
+    infoText:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -INFO_TOP)
+    infoText:SetJustifyH("LEFT")
+    infoText:SetTextColor(0.65, 0.60, 0.75)
+    infoText:SetText(
+        "All characters are always tracked in the database.\n" ..
+        "|cffcc88ffWhitelist|r: only listed characters appear in the tracker.\n" ..
+        "|cffcc88ffBlacklist|r: listed characters are hidden from the tracker."
+    )
+
+    -- Mode label + buttons
+    local MODE_TOP = INFO_TOP + 50
+    local modeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    modeLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -MODE_TOP)
+    modeLabel:SetText("List Mode:")
+    modeLabel:SetTextColor(0.80, 0.75, 0.90)
+
+    local modeRow = CreateFrame("Frame", nil, f)
+    modeRow:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -(MODE_TOP + 18))
+    modeRow:SetSize(SW - 28, 22)
+
+    local modeBtns = {}
+    local modes = {
+        { "None",      "none"      },
+        { "Whitelist", "whitelist" },
+        { "Blacklist", "blacklist" },
+    }
+    local btnW = math.floor((SW - 28) / 3)
+    for i, m in ipairs(modes) do
+        local btn = CreateFrame("Button", nil, modeRow, "BackdropTemplate")
+        btn:SetSize(btnW - 2, 22)
+        btn:SetPoint("TOPLEFT", modeRow, "TOPLEFT", (i - 1) * btnW, 0)
+        btn:SetBackdrop({
+            bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 8,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 },
+        })
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("CENTER")
+        lbl:SetText(m[1])
+        btn.mode  = m[2]
+        btn.label = lbl
+        btn:SetScript("OnClick", function()
+            GetSettings().listMode = m[2]
+            RefreshSettingsWindow()
+            DundunTracker_RefreshWindow()
+        end)
+        modeBtns[i] = btn
+    end
+    f.modeBtns = modeBtns
+
+    -- Divider
+    local DIVIDER_TOP = MODE_TOP + 18 + 22 + 8
+    local divider = f:CreateTexture(nil, "ARTWORK")
+    divider:SetColorTexture(0.4, 0.25, 0.6, 0.45)
+    divider:SetHeight(1)
+    divider:SetPoint("TOPLEFT",  f, "TOPLEFT",   8, -DIVIDER_TOP)
+    divider:SetPoint("TOPRIGHT", f, "TOPRIGHT",  -8, -DIVIDER_TOP)
+
+    -- "No mode selected" placeholder
+    local LIST_TOP = DIVIDER_TOP + 8
+    local noModeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    noModeLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -LIST_TOP)
+    noModeLabel:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -LIST_TOP)
+    noModeLabel:SetJustifyH("LEFT")
+    noModeLabel:SetTextColor(0.40, 0.38, 0.48)
+    noModeLabel:SetText("Select Whitelist or Blacklist above to manage the character list.")
+    f.noModeLabel = noModeLabel
+
+    -- Character list scroll frame
+    local listScroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
+    listScroll:SetPoint("TOPLEFT",     f, "TOPLEFT",      10, -LIST_TOP)
+    listScroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  -26, 10)
+
+    local listContent = CreateFrame("Frame", nil, listScroll)
+    listContent:SetSize(SW - 36, 1)
+    listContent.checkboxes = {}
+    listScroll:SetScrollChild(listContent)
+
+    f.listScroll   = listScroll
+    f.listContent  = listContent
+
+    tinsert(UISpecialFrames, "DundunTrackerSettingsWindow")
+    return f
+end
+
+local function ToggleSettingsWindow()
+    if not settingsWindow then
+        settingsWindow = CreateSettingsWindow()
+    end
+    if settingsWindow:IsShown() then
+        settingsWindow:Hide()
+    else
+        RefreshSettingsWindow()
+        settingsWindow:Show()
+    end
+end
+
+-- ============================================================
 --  Show / Toggle
 -- ============================================================
 
 local function AutoSizeWindow()
     if not DundunTrackerDB then return end
     local count = 0
-    for _, v in pairs(DundunTrackerDB) do
-        if type(v) == "table" then count = count + 1 end
+    for k, v in pairs(DundunTrackerDB) do
+        if type(v) == "table" and IsCharVisible(k) then count = count + 1 end
     end
     if count == 0 then return end
     -- Fixed vertical overhead: top inset + title bar + gap + quote bar + gap + header + gap
