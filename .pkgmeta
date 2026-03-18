@@ -4,3 +4,4 @@ ignore:
   - .pkgmeta
   - .github
   - README.md
+  - CHANGELOG.md
