@@ -150,6 +150,7 @@ local MIN_WIN_H   = 160
 -- ============================================================
 
 local window
+local ToggleSettingsWindow  -- forward declaration; defined after CreateWindow
 
 local function CreateRow(parent, index)
     local row = CreateFrame("Frame", nil, parent)
@@ -377,7 +378,7 @@ function DundunTracker_RefreshWindow()
 
     local sorted = {}
     for k, v in pairs(DundunTrackerDB) do
-        if type(v) == "table" and IsCharVisible(k) then
+        if type(v) == "table" and k:sub(1,1) ~= "_" and IsCharVisible(k) then
             table.insert(sorted, { key = k, data = v })
         end
     end
@@ -461,7 +462,7 @@ local function RefreshSettingsWindow()
     local sorted = {}
     if DundunTrackerDB then
         for k, v in pairs(DundunTrackerDB) do
-            if type(v) == "table" then
+            if type(v) == "table" and k:sub(1,1) ~= "_" then
                 table.insert(sorted, { key = k, data = v })
             end
         end
@@ -654,7 +655,7 @@ local function AutoSizeWindow()
     if not DundunTrackerDB then return end
     local count = 0
     for k, v in pairs(DundunTrackerDB) do
-        if type(v) == "table" and IsCharVisible(k) then count = count + 1 end
+        if type(v) == "table" and k:sub(1,1) ~= "_" and IsCharVisible(k) then count = count + 1 end
     end
     if count == 0 then return end
     -- Fixed vertical overhead: top inset + title bar + gap + quote bar + gap + header + gap
@@ -699,8 +700,8 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
 
         -- Startup diagnostic: tells us how many chars were loaded from disk
         local count = 0
-        for _, v in pairs(DundunTrackerDB) do
-            if type(v) == "table" then count = count + 1 end
+        for k, v in pairs(DundunTrackerDB) do
+            if type(v) == "table" and k:sub(1,1) ~= "_" then count = count + 1 end
         end
         if count > 0 then
             print(string.format(
@@ -758,7 +759,7 @@ SlashCmdList["DUNDUN"] = function(msg)
         local count = 0
         if DundunTrackerDB then
             for k, v in pairs(DundunTrackerDB) do
-                if type(v) == "table" then
+                if type(v) == "table" and k:sub(1,1) ~= "_" then
                     count = count + 1
                     local staleFlag = (v.lastSaved and v.lastSaved < dbgWeekStart) and "|cffFF4444STALE|r" or "|cff44FF44fresh|r"
                     print(string.format("  |cffFFFF00%s|r => qty=%s weekly=%s lastSaved=%s [%s]",
