@@ -192,12 +192,12 @@ local function ScanProfessionGear()
     local charProfs = {}
     local function tryProf(profIndex)
         if not profIndex then return end
-        local _, _, skillLevel, _, _, _, skillLine = GetProfessionInfo(profIndex)
+        -- Return value 11 is the expansion-prefixed tier name, e.g.
+        -- "Midnight Alchemy" vs "Khaz Algar Alchemy" (Altoholic uses this
+        -- same field; skillLevel alone cannot distinguish expansion tiers).
+        local _, _, _, _, _, _, skillLine, _, _, _, currentLevelName = GetProfessionInfo(profIndex)
         if not (skillLine and EPIC_PROF_GEAR[skillLine]) then return end
-        -- Secondary professions have no expansion tier so skillLevel may be 0
-        -- even when fully levelled; only gate on skillLevel > 0 for primaries.
-        local isSecondary = SECONDARY_PROFS[skillLine]
-        if isSecondary or (skillLevel and skillLevel > 0) then
+        if currentLevelName and currentLevelName:find("Midnight") then
             charProfs[skillLine] = true
         end
     end
@@ -1415,10 +1415,11 @@ SlashCmdList["DUNDUN"] = function(msg)
         local labels = { "Primary1", "Primary2", "Archaeology", "Fishing", "Cooking" }
         for i, idx in ipairs(slots) do
             if idx then
-                local name, _, skillLevel, maxSkillLevel, _, _, skillLine = GetProfessionInfo(idx)
-                print(string.format("  [%s] idx=|cffFFFF00%d|r  name=|cffFFFF00%s|r  skillLine=|cffFFFF00%s|r  skillLevel=|cffFFFF00%s|r  maxSkillLevel=|cffFFFF00%s|r  inGearTable=|cffFFFF00%s|r",
-                    labels[i], idx,
-                    tostring(name), tostring(skillLine),
+                local name, _, skillLevel, maxSkillLevel, _, _, skillLine, _, _, _, currentLevelName = GetProfessionInfo(idx)
+                print(string.format("  [%s] skillLine=|cffFFFF00%s|r  currentLevelName=|cffFFFF00%s|r  skillLevel=|cffFFFF00%s|r/%s  inGearTable=|cffFFFF00%s|r",
+                    labels[i],
+                    tostring(skillLine),
+                    tostring(currentLevelName),
                     tostring(skillLevel), tostring(maxSkillLevel),
                     tostring(EPIC_PROF_GEAR[skillLine] ~= nil)))
             else
