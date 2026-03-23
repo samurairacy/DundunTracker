@@ -53,12 +53,12 @@ local abundanceScanTicker = nil  -- 60-second re-scan ticker
 --  Profession gear data tables
 -- ============================================================
 
-local SECONDARY_PROFS = { [184] = true, [356] = true }
+local SECONDARY_PROFS = { [185] = true, [356] = true }
 
 local PROF_LABELS = {
     [171] = "Alch",  [164] = "BS",   [333] = "Ench", [202] = "Eng",
     [182] = "Herb",  [773] = "Insc", [755] = "JC",   [165] = "LW",
-    [186] = "Mine",  [393] = "Skin", [197] = "Tail", [184] = "Cook",
+    [186] = "Mine",  [393] = "Skin", [197] = "Tail", [185] = "Cook",
     [356] = "Fish",
 }
 
@@ -66,7 +66,7 @@ local PROF_FULL_NAMES = {
     [171] = "Alchemy",        [164] = "Blacksmithing", [333] = "Enchanting",
     [202] = "Engineering",    [182] = "Herbalism",     [773] = "Inscription",
     [755] = "Jewelcrafting",  [165] = "Leatherworking",[186] = "Mining",
-    [393] = "Skinning",       [197] = "Tailoring",     [184] = "Cooking",
+    [393] = "Skinning",       [197] = "Tailoring",     [185] = "Cooking",
     [356] = "Fishing",
 }
 
@@ -82,7 +82,7 @@ local EPIC_PROF_GEAR = {
     [773] = { 259209, 246524, 246525 },   -- Inscription
     [202] = { 259183, 259171, 244810 },   -- Engineering
     [171] = { 259205, 244812, 267052 },   -- Alchemy
-    [184] = { 259207, 267054 },           -- Cooking (2 items only)
+    [185] = { 259207, 267054 },           -- Cooking (2 items only)
     [356] = { 259179 },                   -- Fishing (1 item only)
 }
 
