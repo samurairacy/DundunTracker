@@ -412,7 +412,7 @@ local function UpdateAbundanceBar()
     else
         caveStr = string.format("|cffcc88ff%s|r", abundanceSubName or "Unknown Cave")
     end
-    f.abundanceText:SetText(caveStr .. "  |cff555555||r  " .. timeStr)
+    f.abundanceText:SetText(caveStr .. "  |cff555555|||r  " .. timeStr)
 end
 
 -- ============================================================
