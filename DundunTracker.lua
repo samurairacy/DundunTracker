@@ -685,7 +685,7 @@ end
 
 local ldb = LibStub("LibDataBroker-1.1"):NewDataObject("DundunTracker", {
     type  = "data source",
-    icon  = "Interface\\AddOns\\DundunTracker\\Media\\DundunIcon",
+    icon  = "Interface\\AddOns\\DundunTracker\\Media\\dundun-small",
     label = "DunDun Tracker",
     OnClick = function(_, btn)
         if btn == "RightButton" then
