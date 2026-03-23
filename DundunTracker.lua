@@ -34,15 +34,18 @@ end
 --  Abundance event data
 -- ============================================================
 
+-- poiKey = the suffix of the "Abundance: <X>" POI name in-game (may differ from the
+-- display name). Confirmed from in-game observation; update others as they are seen.
 local ABUNDANCE_CAVES = {
-    { name = "Watha'nan Crypts",    zone = "Eversong Woods", mapID = 2395 },
-    { name = "Loaknit Den",         zone = "Zul'Aman",       mapID = 2437 },
-    { name = "Floaret Grotto",      zone = "Harandar",       mapID = 2413 },
-    { name = "Abundant Voidburrow", zone = "Voidstorm",      mapID = 2405 },
+    { name = "Watha'nan Crypts",    zone = "Eversong Woods", mapID = 2395, poiKey = "Watha'nan Crypts" },
+    { name = "Loaknit Den",         zone = "Zul'Aman",       mapID = 2437, poiKey = "Skinning Den" },
+    { name = "Floaret Grotto",      zone = "Harandar",       mapID = 2413, poiKey = "Floaret Grotto" },
+    { name = "Abundant Voidburrow", zone = "Voidstorm",      mapID = 2405, poiKey = "Abundant Voidburrow" },
 }
 
-local abundanceCave       = nil  -- active cave entry, or nil if unknown
+local abundanceCave       = nil  -- matched cave entry, or nil if unknown
 local abundancePoiID      = nil  -- active POI ID for GetAreaPOISecondsLeft
+local abundanceSubName    = nil  -- raw "Abundance: X" suffix when cave isn't matched
 local abundanceTicker     = nil  -- 1-second countdown ticker (while window open)
 local abundanceScanTicker = nil  -- 60-second re-scan ticker
 
@@ -340,20 +343,36 @@ end
 -- ============================================================
 
 local function ScanAbundanceCave()
-    abundanceCave  = nil
-    abundancePoiID = nil
+    abundanceCave    = nil
+    abundancePoiID   = nil
+    abundanceSubName = nil
     if not C_AreaPoiInfo then return end
+    -- The same Abundance POI ID appears on multiple zone maps, so deduplicate
+    -- by ID and match by the "Abundance: <X>" name prefix, not by isCurrentEvent
+    -- (which is true for all current events) or by map membership.
+    local seen = {}
     for _, cave in ipairs(ABUNDANCE_CAVES) do
         local pois = C_AreaPoiInfo.GetEventsForMap(cave.mapID)
         if pois then
             for _, poiID in ipairs(pois) do
-                local info = C_AreaPoiInfo.GetAreaPOIInfo(cave.mapID, poiID)
-                if info and info.name then
-                    local lname = info.name:lower()
-                    if lname:find("abundance") or lname == cave.name:lower() then
-                        if info.isCurrentEvent then
-                            abundanceCave  = cave
-                            abundancePoiID = poiID
+                if not seen[poiID] then
+                    seen[poiID] = true
+                    local info = C_AreaPoiInfo.GetAreaPOIInfo(cave.mapID, poiID)
+                    if info and info.name then
+                        local sub = info.name:match("^Abundance:%s*(.+)$")
+                        if sub then
+                            abundancePoiID   = poiID
+                            abundanceSubName = sub
+                            -- Match sub-name to a known cave's poiKey
+                            for _, c in ipairs(ABUNDANCE_CAVES) do
+                                if sub:lower() == c.poiKey:lower() then
+                                    abundanceCave = c
+                                    return
+                                end
+                            end
+                            -- Active event found but poiKey not yet catalogued;
+                            -- abundancePoiID / abundanceSubName are set so the
+                            -- countdown still works, just without zone info.
                             return
                         end
                     end
@@ -376,14 +395,20 @@ end
 
 local function UpdateAbundanceBar()
     if not window or not window.abundanceText then return end
-    if not abundanceCave then
+    if not abundancePoiID then
         window.abundanceText:SetText("|cff888888Locating event...|r")
         return
     end
-    local secsLeft = abundancePoiID and C_AreaPoiInfo.GetAreaPOISecondsLeft(abundancePoiID)
-    local caveStr  = string.format("|cffcc88ff%s|r |cff888888(%s)|r",
-        abundanceCave.name, abundanceCave.zone)
+    local secsLeft = C_AreaPoiInfo.GetAreaPOISecondsLeft(abundancePoiID)
     local timeStr  = string.format("|cffFFFF00%s|r", FormatCountdown(secsLeft))
+    local caveStr
+    if abundanceCave then
+        caveStr = string.format("|cffcc88ff%s|r |cff888888(%s)|r",
+            abundanceCave.name, abundanceCave.zone)
+    else
+        -- Known event, unknown cave mapping — show raw sub-name without zone
+        caveStr = string.format("|cffcc88ff%s|r", abundanceSubName or "Unknown Cave")
+    end
     window.abundanceText:SetText(caveStr .. "  |cff555555||r  " .. timeStr)
 end
 
@@ -1353,9 +1378,10 @@ SlashCmdList["DUNDUN"] = function(msg)
                 end
             end
         end
-        print(string.format("  Cached: cave=|cffFFFF00%s|r  poiID=|cffFFFF00%s|r",
+        print(string.format("  Cached: cave=|cffFFFF00%s|r  poiID=|cffFFFF00%s|r  subName=|cffFFFF00%s|r",
             abundanceCave and abundanceCave.name or "nil",
-            tostring(abundancePoiID)))
+            tostring(abundancePoiID),
+            tostring(abundanceSubName)))
 
     elseif cmd == "debug" then
         local info = C_CurrencyInfo.GetCurrencyInfo(CURRENCY_ID)
