@@ -655,13 +655,13 @@ local function CreateWindow()
     titleText:SetText("|cffcc88ffShard of Dundun|r")
 
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 2, -2)
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -4)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
     -- Settings button
     local gearBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
     gearBtn:SetSize(58, 20)
-    gearBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -32, -4)
+    gearBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -34, -6)
     gearBtn:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -678,7 +678,7 @@ local function CreateWindow()
     -- Help button (? immediately left of Settings button)
     local helpBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
     helpBtn:SetSize(26, 20)
-    helpBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -94, -4)
+    helpBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -96, -6)
     helpBtn:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
