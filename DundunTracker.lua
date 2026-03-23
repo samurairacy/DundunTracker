@@ -680,6 +680,35 @@ local function ToggleWindow()
 end
 
 -- ============================================================
+--  Minimap button (LibDBIcon)
+-- ============================================================
+
+local ldb = LibStub("LibDataBroker-1.1"):NewDataObject("DundunTracker", {
+    type  = "data source",
+    icon  = "Interface\\AddOns\\DundunTracker\\Media\\DundunIcon",
+    label = "DunDun Tracker",
+    OnClick = function(_, btn)
+        if btn == "RightButton" then
+            ToggleSettingsWindow()
+        else
+            ToggleWindow()
+        end
+    end,
+    OnTooltipShow = function(tt)
+        tt:AddLine("|cffcc88ffDunDun Tracker|r")
+        tt:AddLine("|cffaaaaaaLeft-click|r to toggle window")
+        tt:AddLine("|cffaaaaaaRight-click|r to toggle settings")
+    end,
+})
+
+local icon = LibStub("LibDBIcon-1.0")
+
+local function RegisterMinimapButton()
+    DundunTrackerDB._minimapIcon = DundunTrackerDB._minimapIcon or { hide = false }
+    icon:Register("DundunTracker", ldb, DundunTrackerDB._minimapIcon)
+end
+
+-- ============================================================
 --  Events
 -- ============================================================
 
@@ -694,6 +723,20 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         DundunTrackerDB = DundunTrackerDB or {}
 
+        -- DB migration: safely initialise any missing top-level fields
+        if not DundunTrackerDB._minimapIcon then
+            DundunTrackerDB._minimapIcon = { hide = false }
+        end
+        local s = DundunTrackerDB._settings
+        if s then
+            if s.expandPrimaryGear   == nil then s.expandPrimaryGear   = false end
+            if s.expandSecondaryGear == nil then s.expandSecondaryGear = false end
+            if s.expandFusedVitality == nil then s.expandFusedVitality = false end
+            if s.expandUnalloyed     == nil then s.expandUnalloyed     = false end
+        end
+
+        RegisterMinimapButton()
+
         -- Startup diagnostic: tells us how many chars were loaded from disk
         local count = 0
         for k, v in pairs(DundunTrackerDB) do
@@ -704,7 +747,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
                 "|cffcc88ffDunDun Tracker|r loaded — found |cffFFFF00%d|r saved character(s) from disk.",
                 count))
         else
-            print("|cffcc88ffDunDun Tracker|r loaded — no saved data found yet. Type |cffFFFF00/dundun|r then hit Save & Reload.")
+            print("|cffcc88ffDunDun Tracker|r loaded — no saved data found yet. Type |cffFFFF00/dundun|r to open.")
         end
 
     elseif event == "PLAYER_ENTERING_WORLD" then
