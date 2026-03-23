@@ -31,21 +31,99 @@ local function GetNextQuote()
 end
 
 -- ============================================================
+--  Profession gear data tables
+-- ============================================================
+
+local SECONDARY_PROFS = { [184] = true, [356] = true }
+
+local PROF_LABELS = {
+    [171] = "Alch",  [164] = "BS",   [333] = "Ench", [202] = "Eng",
+    [182] = "Herb",  [773] = "Insc", [755] = "JC",   [165] = "LW",
+    [186] = "Mine",  [393] = "Skin", [197] = "Tail", [184] = "Cook",
+    [356] = "Fish",
+}
+
+local PROF_FULL_NAMES = {
+    [171] = "Alchemy",        [164] = "Blacksmithing", [333] = "Enchanting",
+    [202] = "Engineering",    [182] = "Herbalism",     [773] = "Inscription",
+    [755] = "Jewelcrafting",  [165] = "Leatherworking",[186] = "Mining",
+    [393] = "Skinning",       [197] = "Tailoring",     [184] = "Cooking",
+    [356] = "Fishing",
+}
+
+local EPIC_PROF_GEAR = {
+    [186] = { 246534, 259175, 259173 },   -- Mining
+    [182] = { 246533, 267060, 244807 },   -- Herbalism
+    [393] = { 246535, 244808, 244809 },   -- Skinning
+    [333] = { 244177, 246523, 246527 },   -- Enchanting
+    [197] = { 259177, 259234, 246514 },   -- Tailoring
+    [165] = { 246536, 259232, 244811 },   -- Leatherworking
+    [164] = { 246537, 259230, 244813 },   -- Blacksmithing
+    [755] = { 259181, 246526, 244814 },   -- Jewelcrafting
+    [773] = { 259209, 246524, 246525 },   -- Inscription
+    [202] = { 259183, 259171, 244810 },   -- Engineering
+    [171] = { 259205, 244812, 267052 },   -- Alchemy
+    [184] = { 259207, 267054 },           -- Cooking (2 items only)
+    [356] = { 259179 },                   -- Fishing (1 item only)
+}
+
+local EPIC_PROF_GEAR_NAMES = {
+    [246534] = "Sunforged Pickaxe",
+    [259175] = "Heavy-Duty Rock Assister",
+    [259173] = "Rock Bonkin' Hardhat",
+    [246533] = "Sunforged Sickle",
+    [267060] = "Thalassian Herbalist's Cowl",
+    [244807] = "Thalassian Herbtender's Cradle",
+    [246535] = "Sunforged Skinning Knife",
+    [244808] = "Thalassian Wildseeker's Workbag",
+    [244809] = "Thalassian Wildseeker's Stridercap",
+    [244177] = "Runed Dazzling Thorium Rod",
+    [246523] = "Super Elegant Artisan's Enchanting Hat",
+    [246527] = "Attuned Thalassian Rune-Prism",
+    [259177] = "Self-Sharpening Sin'dorei Snippers",
+    [259234] = "Sunforged Needle Set",
+    [246514] = "Super Elegant Artisan's Tailoring Robe",
+    [246536] = "Sunforged Leatherworker's Knife",
+    [259232] = "Sunforged Leatherworker's Toolset",
+    [244811] = "Thalassian Hideshaper's Regalia",
+    [246537] = "Sunforged Blacksmith's Hammer",
+    [259230] = "Sunforged Blacksmith's Toolbox",
+    [244813] = "Thalassian Ironbender's Regalia",
+    [259181] = "Giga-Gem Grippers",
+    [246526] = "Mage-Eye Precision Loupes",
+    [244814] = "Thalassian Gemshaper's Grand Cover",
+    [259209] = "Gilded Sin'dorei Quill",
+    [246524] = "Flawless Text Scrutinizers",
+    [246525] = "Thalassian Scribe's Crystalline Lens",
+    [259183] = "Turbo-Junker's Multitool v9",
+    [259171] = "Head-Mounted Beam Bummer",
+    [244810] = "Thalassian Scrapmaster's Gauntlets",
+    [259205] = "Gilded Alchemist's Mixing Rod",
+    [244812] = "Thalassian Alchemist's Mixcap",
+    [267052] = "Thalassian Alchemy Coveralls",
+    [259207] = "Gilded Sin'dorei Rolling Pin",
+    [267054] = "Thalassian Chef's Chapeau",
+    [259179] = "Sin'dorei Reeler's Rod",
+}
+
+-- ============================================================
 --  Saved Variables  (per-account, shared across all chars)
 -- ============================================================
 -- DundunTrackerDB["CharName-Realm"] = {
---     name         = "CharName",
---     realm        = "Realm",
---     class        = "WARRIOR",
---     quantity     = 3,
---     weeklyEarned = 5,
---     weeklyCap    = 8,
---     totalCap     = 8,
---     lastSaved    = <unix timestamp>,   -- set every time SaveCurrentChar runs
+--     name               = "CharName",
+--     realm              = "Realm",
+--     class              = "WARRIOR",
+--     quantity           = 3,
+--     weeklyEarned       = 5,
+--     weeklyCap          = 8,
+--     totalCap           = 8,
+--     lastSaved          = <unix timestamp>,
+--     professions        = { [skillLine] = true, ... },
+--     profGear           = { [skillLine] = { itemID, ... } },
+--     fusedVitality      = N,
+--     unalloyedAbundance = N,
 -- }
 -- DundunTrackerDB._lastResetTime = <unix timestamp>
---     Set whenever the current character's weeklyEarned drops, indicating a
---     weekly reset occurred. Used to zero out stale alt data in the UI.
 
 -- ============================================================
 --  Helpers
@@ -77,6 +155,67 @@ end
 --  Data write
 -- ============================================================
 
+local function ScanProfessionGear()
+    -- Build item -> skillLine lookup
+    local itemToSkillLine = {}
+    for skillLine, items in pairs(EPIC_PROF_GEAR) do
+        for _, itemID in ipairs(items) do
+            itemToSkillLine[itemID] = skillLine
+        end
+    end
+
+    -- Determine which professions this character has with gear entries
+    local charProfs = {}
+    local profIndexes = { GetProfessions() }
+    for _, profIndex in ipairs(profIndexes) do
+        if profIndex then
+            local _, _, _, _, _, _, skillLine = GetProfessionInfo(profIndex)
+            if skillLine and EPIC_PROF_GEAR[skillLine] then
+                charProfs[skillLine] = true
+            end
+        end
+    end
+
+    -- Scan equipped slots 1-19
+    local foundSets = {}
+    for slot = 1, 19 do
+        local itemID = GetInventoryItemID("player", slot)
+        if itemID and itemToSkillLine[itemID] then
+            local sl = itemToSkillLine[itemID]
+            if charProfs[sl] then
+                if not foundSets[sl] then foundSets[sl] = {} end
+                foundSets[sl][itemID] = true
+            end
+        end
+    end
+
+    -- Scan bags 0-4
+    for bag = 0, 4 do
+        local numSlots = C_Container.GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local info = C_Container.GetContainerItemInfo(bag, slot)
+            if info and info.itemID and itemToSkillLine[info.itemID] then
+                local sl = itemToSkillLine[info.itemID]
+                if charProfs[sl] then
+                    if not foundSets[sl] then foundSets[sl] = {} end
+                    foundSets[sl][info.itemID] = true
+                end
+            end
+        end
+    end
+
+    -- Convert sets to arrays
+    local profGear = {}
+    for sl, itemSet in pairs(foundSets) do
+        profGear[sl] = {}
+        for itemID in pairs(itemSet) do
+            table.insert(profGear[sl], itemID)
+        end
+    end
+
+    return charProfs, profGear
+end
+
 local function SaveCurrentChar()
     if not DundunTrackerDB then return end
     local info = C_CurrencyInfo.GetCurrencyInfo(CURRENCY_ID)
@@ -87,7 +226,7 @@ local function SaveCurrentChar()
     local totalCap  = (info.maxQuantity and info.maxQuantity > 0)
                       and info.maxQuantity or TOTAL_CAP
 
-    local key            = GetCharKey()
+    local key             = GetCharKey()
     local newWeeklyEarned = info.quantityEarnedThisWeek or 0
 
     -- If weekly earned dropped from last save, a reset occurred — record it.
@@ -96,15 +235,38 @@ local function SaveCurrentChar()
         DundunTrackerDB._lastResetTime = GetServerTime()
     end
 
+    -- Scan profession gear
+    local charProfs, profGear = ScanProfessionGear()
+
+    -- Scan bags for Fused Vitality (item ID 245345)
+    local fusedVitality = 0
+    for bag = 0, 4 do
+        local numSlots = C_Container.GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local slotInfo = C_Container.GetContainerItemInfo(bag, slot)
+            if slotInfo and slotInfo.itemID == 245345 then
+                fusedVitality = fusedVitality + (slotInfo.stackCount or 1)
+            end
+        end
+    end
+
+    -- Unalloyed Abundance currency (ID 3377)
+    local uaInfo = C_CurrencyInfo.GetCurrencyInfo(3377)
+    local unalloyedAbundance = uaInfo and uaInfo.quantity or 0
+
     DundunTrackerDB[key] = {
-        name         = UnitName("player"),
-        realm        = GetRealmName(),
-        class        = select(2, UnitClass("player")),
-        quantity     = info.quantity or 0,
-        weeklyEarned = newWeeklyEarned,
-        weeklyCap    = weeklyCap,
-        totalCap     = totalCap,
-        lastSaved    = GetServerTime(),
+        name               = UnitName("player"),
+        realm              = GetRealmName(),
+        class              = select(2, UnitClass("player")),
+        quantity           = info.quantity or 0,
+        weeklyEarned       = newWeeklyEarned,
+        weeklyCap          = weeklyCap,
+        totalCap           = totalCap,
+        lastSaved          = GetServerTime(),
+        professions        = charProfs,
+        profGear           = profGear,
+        fusedVitality      = fusedVitality,
+        unalloyedAbundance = unalloyedAbundance,
     }
 end
 
@@ -134,16 +296,62 @@ end
 --  Layout constants
 -- ============================================================
 
-local COL_NAME    = 210
-local COL_WEEKLY  = 115
-local COL_TOTAL   = 115
-local WIN_WIDTH   = COL_NAME + COL_WEEKLY + COL_TOTAL + 32
-local ROW_HEIGHT  = 22
-local HEADER_H    = 22
-local TITLE_BAR_H = 26
-local QUOTE_H     = 24
-local FOOTER_H    = 48
-local MIN_WIN_H   = 160
+local COL_NAME       = 210
+local COL_WEEKLY     = 115
+local COL_TOTAL      = 115
+local COL_PRIMGEAR   = 80
+local COL_SECGEAR    = 80
+local COL_FUSED      = 80
+local COL_UNALLOYED  = 100
+local ROW_HEIGHT     = 22
+local HEADER_H       = 22
+local TITLE_BAR_H    = 26
+local QUOTE_H        = 24
+local FOOTER_H       = 60
+local MIN_WIN_H      = 160
+local BASE_WIN_W     = COL_NAME + COL_WEEKLY + COL_TOTAL + 32
+
+local function GetWindowWidth()
+    local s = (DundunTrackerDB and DundunTrackerDB._settings) or {}
+    local w = BASE_WIN_W
+    if s.expandPrimaryGear   then w = w + COL_PRIMGEAR   end
+    if s.expandSecondaryGear then w = w + COL_SECGEAR    end
+    if s.expandFusedVitality then w = w + COL_FUSED      end
+    if s.expandUnalloyed     then w = w + COL_UNALLOYED  end
+    return w
+end
+
+local function GetExtraColumnOffsets()
+    local s = (DundunTrackerDB and DundunTrackerDB._settings) or {}
+    local x = COL_NAME + COL_WEEKLY + COL_TOTAL
+    local offsets = {}
+    if s.expandPrimaryGear   then offsets.primary   = x; x = x + COL_PRIMGEAR   end
+    if s.expandSecondaryGear then offsets.secondary = x; x = x + COL_SECGEAR    end
+    if s.expandFusedVitality then offsets.fused     = x; x = x + COL_FUSED      end
+    if s.expandUnalloyed     then offsets.unalloyed = x; x = x + COL_UNALLOYED  end
+    return offsets
+end
+
+-- ============================================================
+--  Gear fraction helper
+-- ============================================================
+
+local function GetGearFraction(d, isPrimary)
+    if not d.professions or not d.profGear then return nil end
+    local owned = 0
+    local total = 0
+    for skillLine in pairs(d.professions) do
+        local isSecondary = SECONDARY_PROFS[skillLine]
+        if (isPrimary and not isSecondary) or (not isPrimary and isSecondary) then
+            local items = EPIC_PROF_GEAR[skillLine] or {}
+            total = total + #items
+            local found = d.profGear[skillLine] or {}
+            owned = owned + #found
+        end
+    end
+    if total == 0 then return nil end
+    return owned, total
+end
 
 -- ============================================================
 --  Window
@@ -164,6 +372,7 @@ local function CreateRow(parent, index)
 
     local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameText:SetPoint("LEFT", row, "LEFT", 6, 0)
+    nameText:SetWidth(COL_NAME - 6)
     nameText:SetWordWrap(false)
     nameText:SetJustifyH("LEFT")
 
@@ -177,15 +386,103 @@ local function CreateRow(parent, index)
     totalText:SetWidth(COL_TOTAL)
     totalText:SetJustifyH("CENTER")
 
-    row.nameText   = nameText
-    row.weeklyText = weeklyText
-    row.totalText  = totalText
+    -- Extra columns — repositioned dynamically in RefreshWindow
+    local primGearText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    primGearText:SetWidth(COL_PRIMGEAR)
+    primGearText:SetJustifyH("CENTER")
+    primGearText:Hide()
+
+    local secGearText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    secGearText:SetWidth(COL_SECGEAR)
+    secGearText:SetJustifyH("CENTER")
+    secGearText:Hide()
+
+    local fusedText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fusedText:SetWidth(COL_FUSED)
+    fusedText:SetJustifyH("CENTER")
+    fusedText:Hide()
+
+    local unalloyedText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    unalloyedText:SetWidth(COL_UNALLOYED)
+    unalloyedText:SetJustifyH("CENTER")
+    unalloyedText:Hide()
+
+    -- Invisible hit frames for gear tooltips
+    local primGearHit = CreateFrame("Frame", nil, row)
+    primGearHit:SetSize(COL_PRIMGEAR, ROW_HEIGHT)
+    primGearHit:EnableMouse(true)
+    primGearHit:Hide()
+    primGearHit:SetScript("OnEnter", function(self)
+        local d = self.charData
+        if not d or not d.professions or not d.profGear then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+        for skillLine in pairs(d.professions) do
+            if not SECONDARY_PROFS[skillLine] then
+                GameTooltip:AddLine(PROF_FULL_NAMES[skillLine] or tostring(skillLine), 1, 0.82, 0)
+                local items = EPIC_PROF_GEAR[skillLine] or {}
+                local gearFound = d.profGear[skillLine] or {}
+                local foundSet = {}
+                for _, id in ipairs(gearFound) do foundSet[id] = true end
+                for _, itemID in ipairs(items) do
+                    local name = EPIC_PROF_GEAR_NAMES[itemID] or ("Item " .. itemID)
+                    if foundSet[itemID] then
+                        GameTooltip:AddLine("|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t " .. name, 0.2, 1.0, 0.3)
+                    else
+                        GameTooltip:AddLine("|TInterface\\RaidFrame\\ReadyCheck-NotReady:12:12|t " .. name, 1.0, 0.3, 0.3)
+                    end
+                end
+            end
+        end
+        GameTooltip:Show()
+    end)
+    primGearHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    local secGearHit = CreateFrame("Frame", nil, row)
+    secGearHit:SetSize(COL_SECGEAR, ROW_HEIGHT)
+    secGearHit:EnableMouse(true)
+    secGearHit:Hide()
+    secGearHit:SetScript("OnEnter", function(self)
+        local d = self.charData
+        if not d or not d.professions or not d.profGear then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+        for skillLine in pairs(d.professions) do
+            if SECONDARY_PROFS[skillLine] then
+                GameTooltip:AddLine(PROF_FULL_NAMES[skillLine] or tostring(skillLine), 1, 0.82, 0)
+                local items = EPIC_PROF_GEAR[skillLine] or {}
+                local gearFound = d.profGear[skillLine] or {}
+                local foundSet = {}
+                for _, id in ipairs(gearFound) do foundSet[id] = true end
+                for _, itemID in ipairs(items) do
+                    local name = EPIC_PROF_GEAR_NAMES[itemID] or ("Item " .. itemID)
+                    if foundSet[itemID] then
+                        GameTooltip:AddLine("|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t " .. name, 0.2, 1.0, 0.3)
+                    else
+                        GameTooltip:AddLine("|TInterface\\RaidFrame\\ReadyCheck-NotReady:12:12|t " .. name, 1.0, 0.3, 0.3)
+                    end
+                end
+            end
+        end
+        GameTooltip:Show()
+    end)
+    secGearHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    row.nameText      = nameText
+    row.weeklyText    = weeklyText
+    row.totalText     = totalText
+    row.primGearText  = primGearText
+    row.secGearText   = secGearText
+    row.fusedText     = fusedText
+    row.unalloyedText = unalloyedText
+    row.primGearHit   = primGearHit
+    row.secGearHit    = secGearHit
     return row
 end
 
 local function CreateWindow()
     local f = CreateFrame("Frame", "DundunTrackerWindow", UIParent, "BackdropTemplate")
-    f:SetSize(WIN_WIDTH, 280)
+    f:SetSize(GetWindowWidth(), 280)
     f:SetPoint("CENTER")
     f:SetFrameStrata("MEDIUM")
     f:SetMovable(true)
@@ -195,7 +492,7 @@ local function CreateWindow()
     f:SetScript("OnDragStop",  f.StopMovingOrSizing)
     f:SetClampedToScreen(true)
     f:SetResizable(true)
-    f:SetResizeBounds(WIN_WIDTH, MIN_WIN_H)
+    f:SetResizeBounds(BASE_WIN_W, MIN_WIN_H)
 
     f:SetBackdrop({
         bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -279,8 +576,9 @@ local function CreateWindow()
     headerRow:SetPoint("TOPLEFT",  f, "TOPLEFT",  8,  -HEADER_TOP)
     headerRow:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -HEADER_TOP)
     headerRow:SetHeight(HEADER_H)
+    f.headerRow = headerRow
 
-    local function HeaderCell(text, x, w)
+    local function FixedHeaderCell(text, x, w)
         local fs = headerRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         fs:SetPoint("TOPLEFT", headerRow, "TOPLEFT", x, 0)
         fs:SetSize(w, HEADER_H)
@@ -288,9 +586,23 @@ local function CreateWindow()
         fs:SetText(text)
         fs:SetTextColor(0.9, 0.8, 0.5)
     end
-    HeaderCell("Character",       0,                     COL_NAME)
-    HeaderCell("Weekly (picked)", COL_NAME,              COL_WEEKLY)
-    HeaderCell("Total (held)",    COL_NAME + COL_WEEKLY, COL_TOTAL)
+    FixedHeaderCell("Character",       0,                     COL_NAME)
+    FixedHeaderCell("Weekly (picked)", COL_NAME,              COL_WEEKLY)
+    FixedHeaderCell("Total (held)",    COL_NAME + COL_WEEKLY, COL_TOTAL)
+
+    local function ExtraHeaderCell(text, w)
+        local fs = headerRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetSize(w, HEADER_H)
+        fs:SetJustifyH("CENTER")
+        fs:SetText(text)
+        fs:SetTextColor(0.9, 0.8, 0.5)
+        fs:Hide()
+        return fs
+    end
+    f.hdrPrimGear  = ExtraHeaderCell("Prim Gear",  COL_PRIMGEAR)
+    f.hdrSecGear   = ExtraHeaderCell("Sec Gear",   COL_SECGEAR)
+    f.hdrFused     = ExtraHeaderCell("Fused Vit",  COL_FUSED)
+    f.hdrUnalloyed = ExtraHeaderCell("Unalloyed",  COL_UNALLOYED)
 
     local headerDivider = f:CreateTexture(nil, "ARTWORK")
     headerDivider:SetColorTexture(0.5, 0.4, 0.7, 0.5)
@@ -305,7 +617,7 @@ local function CreateWindow()
     scrollFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   FOOTER_H)
 
     local content = CreateFrame("Frame", nil, scrollFrame)
-    content:SetSize(WIN_WIDTH - 36, 1)
+    content:SetSize(GetWindowWidth() - 36, 1)
     content.rows = {}
     scrollFrame:SetScrollChild(content)
 
@@ -319,13 +631,33 @@ local function CreateWindow()
     footerDivider:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",   8, FOOTER_H - 1)
     footerDivider:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, FOOTER_H - 1)
 
-    -- Credit text
-    local creditText = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    creditText:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  12, 12)
-    creditText:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 12)
-    creditText:SetJustifyH("LEFT")
-    creditText:SetTextColor(0.4, 0.35, 0.5)
-    creditText:SetText("Addon by Parmenides-Khaz'goroth; vibecoded using Claude Sonnet 4.6")
+    -- Footer checkboxes — Row 1: Primary Gear | Secondary Gear
+    local function MakeCheckbox(labelText, xOff, yOff, settingKey)
+        local cb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+        cb:SetSize(20, 20)
+        cb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", xOff, yOff)
+        cb.text:SetText(labelText)
+        cb.text:SetTextColor(0.75, 0.70, 0.85)
+        cb:SetScript("OnClick", function(self)
+            GetSettings()[settingKey] = self:GetChecked() and true or false
+            AutoSizeWindow()
+            DundunTracker_RefreshWindow()
+        end)
+        return cb
+    end
+
+    f.cb_primGear  = MakeCheckbox("Primary Gear",        8,   36, "expandPrimaryGear")
+    f.cb_secGear   = MakeCheckbox("Secondary Gear",      150, 36, "expandSecondaryGear")
+    f.cb_fused     = MakeCheckbox("Fused Vitality",      8,   14, "expandFusedVitality")
+    f.cb_unalloyed = MakeCheckbox("Unalloyed Abundance", 150, 14, "expandUnalloyed")
+
+    function f.RefreshCheckboxes()
+        local s = GetSettings()
+        f.cb_primGear:SetChecked(s.expandPrimaryGear   and true or false)
+        f.cb_secGear:SetChecked(s.expandSecondaryGear  and true or false)
+        f.cb_fused:SetChecked(s.expandFusedVitality    and true or false)
+        f.cb_unalloyed:SetChecked(s.expandUnalloyed    and true or false)
+    end
 
     -- Resize grip dots (bottom-right corner)
     local function GripDot(xOff, yOff)
@@ -365,8 +697,6 @@ function DundunTracker_RefreshWindow()
 
     local currentKey = GetCharKey()
 
-    -- Compute the start of the current reset week using the game's own API.
-    -- Any alt whose lastSaved predates this is carrying last-week's data.
     local nextReset = GetServerTime() + C_DateAndTime.GetSecondsUntilWeeklyReset()
     local weekStart = nextReset - (7 * 24 * 3600)
 
@@ -383,6 +713,22 @@ function DundunTracker_RefreshWindow()
     end)
 
     local content = window.content
+    local offsets = GetExtraColumnOffsets()
+
+    -- Update extra column headers
+    local function RefreshHeader(hdr, offset)
+        if offset then
+            hdr:ClearAllPoints()
+            hdr:SetPoint("TOPLEFT", window.headerRow, "TOPLEFT", offset, 0)
+            hdr:Show()
+        else
+            hdr:Hide()
+        end
+    end
+    RefreshHeader(window.hdrPrimGear,  offsets.primary)
+    RefreshHeader(window.hdrSecGear,   offsets.secondary)
+    RefreshHeader(window.hdrFused,     offsets.fused)
+    RefreshHeader(window.hdrUnalloyed, offsets.unalloyed)
 
     for i = #sorted + 1, #content.rows do
         content.rows[i]:Hide()
@@ -401,7 +747,6 @@ function DundunTracker_RefreshWindow()
         local nameLabel = (d.name or "?") .. (d.realm and ("-" .. d.realm) or "")
         row.nameText:SetText(prefix .. ClassColor(d.class or "") .. nameLabel .. "|r")
 
-        -- Alt data saved before this week's reset boundary is stale; show 0.
         local stale = not isCurrent
                       and d.lastSaved
                       and d.lastSaved < weekStart
@@ -416,6 +761,78 @@ function DundunTracker_RefreshWindow()
         local tr, tg, tb = FractionColor(qty, tc)
         row.totalText:SetText(string.format("|cff%02x%02x%02x%d / %d|r",
             tr*255, tg*255, tb*255, qty, tc))
+
+        -- Primary Gear column
+        if offsets.primary then
+            row.primGearText:ClearAllPoints()
+            row.primGearText:SetPoint("LEFT", row, "LEFT", offsets.primary, 0)
+            row.primGearHit:ClearAllPoints()
+            row.primGearHit:SetPoint("TOPLEFT", row, "TOPLEFT", offsets.primary, 0)
+            row.primGearHit.charData = d
+            local owned, total = GetGearFraction(d, true)
+            if owned then
+                local r, g, b = FractionColor(owned, total)
+                row.primGearText:SetText(string.format("|cff%02x%02x%02x%d/%d|r",
+                    r*255, g*255, b*255, owned, total))
+            else
+                row.primGearText:SetText("|cff999999--|r")
+            end
+            row.primGearText:Show()
+            row.primGearHit:Show()
+        else
+            row.primGearText:Hide()
+            row.primGearHit:Hide()
+        end
+
+        -- Secondary Gear column
+        if offsets.secondary then
+            row.secGearText:ClearAllPoints()
+            row.secGearText:SetPoint("LEFT", row, "LEFT", offsets.secondary, 0)
+            row.secGearHit:ClearAllPoints()
+            row.secGearHit:SetPoint("TOPLEFT", row, "TOPLEFT", offsets.secondary, 0)
+            row.secGearHit.charData = d
+            local owned, total = GetGearFraction(d, false)
+            if owned then
+                local r, g, b = FractionColor(owned, total)
+                row.secGearText:SetText(string.format("|cff%02x%02x%02x%d/%d|r",
+                    r*255, g*255, b*255, owned, total))
+            else
+                row.secGearText:SetText("|cff999999--|r")
+            end
+            row.secGearText:Show()
+            row.secGearHit:Show()
+        else
+            row.secGearText:Hide()
+            row.secGearHit:Hide()
+        end
+
+        -- Fused Vitality column
+        if offsets.fused then
+            row.fusedText:ClearAllPoints()
+            row.fusedText:SetPoint("LEFT", row, "LEFT", offsets.fused, 0)
+            if d.fusedVitality ~= nil then
+                row.fusedText:SetText(tostring(d.fusedVitality))
+            else
+                row.fusedText:SetText("|cff999999--|r")
+            end
+            row.fusedText:Show()
+        else
+            row.fusedText:Hide()
+        end
+
+        -- Unalloyed Abundance column
+        if offsets.unalloyed then
+            row.unalloyedText:ClearAllPoints()
+            row.unalloyedText:SetPoint("LEFT", row, "LEFT", offsets.unalloyed, 0)
+            if d.unalloyedAbundance ~= nil then
+                row.unalloyedText:SetText(tostring(d.unalloyedAbundance))
+            else
+                row.unalloyedText:SetText("|cff999999--|r")
+            end
+            row.unalloyedText:Show()
+        else
+            row.unalloyedText:Hide()
+        end
     end
 
     content:SetHeight(math.max(#sorted * ROW_HEIGHT, ROW_HEIGHT))
@@ -431,7 +848,6 @@ local function RefreshSettingsWindow()
     if not settingsWindow then return end
     local s = GetSettings()
 
-    -- Highlight the active mode button
     for _, btn in ipairs(settingsWindow.modeBtns) do
         local active = (btn.mode == s.listMode)
         if active then
@@ -450,7 +866,6 @@ local function RefreshSettingsWindow()
     settingsWindow.listScroll:SetShown(hasMode)
     if not hasMode then return end
 
-    -- Rebuild checkboxes
     local listContent = settingsWindow.listContent
     for _, cb in ipairs(listContent.checkboxes) do cb:Hide() end
 
@@ -519,7 +934,6 @@ local function CreateSettingsWindow()
     f:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
     f:SetBackdropBorderColor(0.4, 0.35, 0.55, 1)
 
-    -- Title bar
     local titleBar = CreateFrame("Frame", nil, f, "BackdropTemplate")
     titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",   8, -6)
     titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT",  -8, -6)
@@ -541,7 +955,6 @@ local function CreateSettingsWindow()
     closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 4, 4)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
-    -- Info text
     local INFO_TOP = 6 + TITLE_BAR_H + 10
     local infoText = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     infoText:SetPoint("TOPLEFT",  f, "TOPLEFT",  14, -INFO_TOP)
@@ -553,7 +966,6 @@ local function CreateSettingsWindow()
         "|cffcc88ffBlacklist|r: listed characters are hidden from the tracker."
     )
 
-    -- Mode label + buttons
     local MODE_TOP = INFO_TOP + 72
     local modeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     modeLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -MODE_TOP)
@@ -595,7 +1007,6 @@ local function CreateSettingsWindow()
     end
     f.modeBtns = modeBtns
 
-    -- Divider
     local DIVIDER_TOP = MODE_TOP + 18 + 22 + 8
     local divider = f:CreateTexture(nil, "ARTWORK")
     divider:SetColorTexture(0.4, 0.25, 0.6, 0.45)
@@ -603,7 +1014,6 @@ local function CreateSettingsWindow()
     divider:SetPoint("TOPLEFT",  f, "TOPLEFT",   8, -DIVIDER_TOP)
     divider:SetPoint("TOPRIGHT", f, "TOPRIGHT",  -8, -DIVIDER_TOP)
 
-    -- "No mode selected" placeholder
     local LIST_TOP = DIVIDER_TOP + 8
     local noModeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     noModeLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -LIST_TOP)
@@ -613,7 +1023,6 @@ local function CreateSettingsWindow()
     noModeLabel:SetText("Select Whitelist or Blacklist above to manage the character list.")
     f.noModeLabel = noModeLabel
 
-    -- Character list scroll frame
     local listScroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
     listScroll:SetPoint("TOPLEFT",     f, "TOPLEFT",      10, -LIST_TOP)
     listScroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  -26, 10)
@@ -647,23 +1056,25 @@ end
 --  Show / Toggle
 -- ============================================================
 
-local function AutoSizeWindow()
-    if not DundunTrackerDB then return end
+function AutoSizeWindow()
+    if not DundunTrackerDB or not window then return end
     local count = 0
     for k, v in pairs(DundunTrackerDB) do
         if type(v) == "table" and k:sub(1,1) ~= "_" and IsCharVisible(k) then count = count + 1 end
     end
     if count == 0 then return end
-    -- Fixed vertical overhead: top inset + title bar + gap + quote bar + gap + header + gap
     local scrollTop = (6 + TITLE_BAR_H + 4) + QUOTE_H + 3 + HEADER_H + 2
     local idealH = scrollTop + FOOTER_H + (count * ROW_HEIGHT) + 8
-    window:SetHeight(math.max(idealH, MIN_WIN_H))
+    local w = GetWindowWidth()
+    window:SetSize(w, math.max(idealH, MIN_WIN_H))
+    window.content:SetSize(w - 36, 1)
 end
 
 local function ShowWindow()
     if not window then
         window = CreateWindow()
     end
+    window.RefreshCheckboxes()
     AutoSizeWindow()
     window.quoteText:SetText(GetNextQuote())
     SaveCurrentChar()
@@ -723,21 +1134,20 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         DundunTrackerDB = DundunTrackerDB or {}
 
-        -- DB migration: safely initialise any missing top-level fields
         if not DundunTrackerDB._minimapIcon then
             DundunTrackerDB._minimapIcon = { hide = false }
         end
-        local s = DundunTrackerDB._settings
-        if s then
-            if s.expandPrimaryGear   == nil then s.expandPrimaryGear   = false end
-            if s.expandSecondaryGear == nil then s.expandSecondaryGear = false end
-            if s.expandFusedVitality == nil then s.expandFusedVitality = false end
-            if s.expandUnalloyed     == nil then s.expandUnalloyed     = false end
+        if not DundunTrackerDB._settings then
+            DundunTrackerDB._settings = { listMode = "none", list = {} }
         end
+        local s = DundunTrackerDB._settings
+        if s.expandPrimaryGear   == nil then s.expandPrimaryGear   = false end
+        if s.expandSecondaryGear == nil then s.expandSecondaryGear = false end
+        if s.expandFusedVitality == nil then s.expandFusedVitality = false end
+        if s.expandUnalloyed     == nil then s.expandUnalloyed     = false end
 
         RegisterMinimapButton()
 
-        -- Startup diagnostic: tells us how many chars were loaded from disk
         local count = 0
         for k, v in pairs(DundunTrackerDB) do
             if type(v) == "table" and k:sub(1,1) ~= "_" then count = count + 1 end
