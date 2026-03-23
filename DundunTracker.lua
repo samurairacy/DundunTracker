@@ -1328,7 +1328,36 @@ SLASH_DUNDUN2 = "/ddt"
 SlashCmdList["DUNDUN"] = function(msg)
     local cmd = strtrim(msg):lower()
 
-    if cmd == "debug" then
+    if cmd == "abundance" then
+        print("|cffcc88ffDunDun Tracker:|r Abundance POI scan:")
+        if not C_AreaPoiInfo then
+            print("  |cffFF4444C_AreaPoiInfo is nil — API unavailable|r")
+            return
+        end
+        for _, cave in ipairs(ABUNDANCE_CAVES) do
+            local pois = C_AreaPoiInfo.GetEventsForMap(cave.mapID)
+            local count = pois and #pois or 0
+            print(string.format("  |cffFFFF00%s|r (mapID %d) — %d event POI(s)",
+                cave.name, cave.mapID, count))
+            if pois then
+                for _, poiID in ipairs(pois) do
+                    local info = C_AreaPoiInfo.GetAreaPOIInfo(cave.mapID, poiID)
+                    if info then
+                        print(string.format("    poiID=|cffFFFF00%d|r  name=|cffFFFF00%s|r  isCurrentEvent=|cffFFFF00%s|r",
+                            poiID,
+                            tostring(info.name),
+                            tostring(info.isCurrentEvent)))
+                    else
+                        print(string.format("    poiID=|cffFFFF00%d|r  GetAreaPOIInfo returned nil", poiID))
+                    end
+                end
+            end
+        end
+        print(string.format("  Cached: cave=|cffFFFF00%s|r  poiID=|cffFFFF00%s|r",
+            abundanceCave and abundanceCave.name or "nil",
+            tostring(abundancePoiID)))
+
+    elseif cmd == "debug" then
         local info = C_CurrencyInfo.GetCurrencyInfo(CURRENCY_ID)
         print("|cffcc88ffDunDun Tracker:|r Raw CurrencyInfo fields:")
         if info then
