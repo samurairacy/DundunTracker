@@ -1425,6 +1425,30 @@ SlashCmdList["DUNDUN"] = function(msg)
                 print(string.format("  [%s] not learned", labels[i]))
             end
         end
+        -- Dump expansion-specific skill sub-lines from C_TradeSkillUI so we
+        -- can identify which line IDs belong to the Midnight tier.
+        print("|cffcc88ffDunDun Tracker:|r C_TradeSkillUI expansion sub-lines:")
+        if C_TradeSkillUI and C_TradeSkillUI.GetAllProfessionTradeSkillLines then
+            local lines = C_TradeSkillUI.GetAllProfessionTradeSkillLines()
+            if lines and #lines > 0 then
+                for _, lineID in ipairs(lines) do
+                    local info = C_TradeSkillUI.GetProfessionInfoBySkillLine(lineID)
+                    if info then
+                        print(string.format("  lineID=|cffFFFF00%d|r  name=|cffFFFF00%s|r  skillLevel=|cffFFFF00%s|r  maxSkillLevel=|cffFFFF00%s|r",
+                            lineID,
+                            tostring(info.professionName),
+                            tostring(info.skillLevel),
+                            tostring(info.maxSkillLevel)))
+                    else
+                        print(string.format("  lineID=|cffFFFF00%d|r  (GetProfessionInfoBySkillLine returned nil)", lineID))
+                    end
+                end
+            else
+                print("  (no lines returned)")
+            end
+        else
+            print("  C_TradeSkillUI.GetAllProfessionTradeSkillLines not available")
+        end
 
     elseif cmd == "debug" then
         local info = C_CurrencyInfo.GetCurrencyInfo(CURRENCY_ID)
