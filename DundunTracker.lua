@@ -1113,7 +1113,7 @@ local function CreateSettingsWindow()
         tile = true, tileSize = 32, edgeSize = 24,
         insets = { left = 6, right = 6, top = 6, bottom = 6 },
     })
-    f:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
+    f:SetBackdropColor(0.05, 0.05, 0.08, 1.0)
     f:SetBackdropBorderColor(0.4, 0.35, 0.55, 1)
 
     local titleBar = CreateFrame("Frame", nil, f, "BackdropTemplate")
@@ -1126,7 +1126,7 @@ local function CreateSettingsWindow()
         tile = true, tileSize = 16, edgeSize = 10,
         insets = { left = 2, right = 2, top = 2, bottom = 2 },
     })
-    titleBar:SetBackdropColor(0.18, 0.10, 0.30, 0.95)
+    titleBar:SetBackdropColor(0.18, 0.10, 0.30, 1.0)
     titleBar:SetBackdropBorderColor(0.55, 0.30, 0.75, 1)
 
     local titleText = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1342,7 +1342,7 @@ local function CreateHelpWindow()
         tile = true, tileSize = 32, edgeSize = 24,
         insets = { left = 6, right = 6, top = 6, bottom = 6 },
     })
-    f:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
+    f:SetBackdropColor(0.05, 0.05, 0.08, 1.0)
     f:SetBackdropBorderColor(0.4, 0.35, 0.55, 1)
 
     local titleBar = CreateFrame("Frame", nil, f, "BackdropTemplate")
@@ -1355,7 +1355,7 @@ local function CreateHelpWindow()
         tile = true, tileSize = 16, edgeSize = 10,
         insets = { left = 2, right = 2, top = 2, bottom = 2 },
     })
-    titleBar:SetBackdropColor(0.18, 0.10, 0.30, 0.95)
+    titleBar:SetBackdropColor(0.18, 0.10, 0.30, 1.0)
     titleBar:SetBackdropBorderColor(0.55, 0.30, 0.75, 1)
 
     local titleText = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
