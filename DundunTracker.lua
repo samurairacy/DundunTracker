@@ -257,7 +257,10 @@ local function SaveCurrentChar()
         profGear  = prev.profGear or {}
     end
 
-    -- Scan bags for Fused Vitality (item ID 245345)
+    -- Scan bags for Fused Vitality (item ID 245345).
+    -- Same teardown caveat as profession gear: bags may be inaccessible at
+    -- PLAYER_LEAVING_WORLD, returning 0. Preserve the previous value when
+    -- the scan finds nothing but the character previously had some.
     local fusedVitality = 0
     for bag = 0, 5 do
         local numSlots = C_Container.GetContainerNumSlots(bag)
@@ -267,6 +270,9 @@ local function SaveCurrentChar()
                 fusedVitality = fusedVitality + (slotInfo.stackCount or 1)
             end
         end
+    end
+    if fusedVitality == 0 and prev and (prev.fusedVitality or 0) > 0 then
+        fusedVitality = prev.fusedVitality
     end
 
     -- Unalloyed Abundance currency (ID 3377)
