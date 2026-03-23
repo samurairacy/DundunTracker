@@ -6,6 +6,7 @@
 ## SavedVariables: DundunTrackerDB
 ## X-Curse-Project-ID: 1488331
 ## X-Wago-ID: aNDMZ46o
+## X-WoWI-ID: 27092
 ## IconTexture: Interface\AddOns\DundunTracker\Media\dundun-small
 
 Libs\LibStub\LibStub.lua
