@@ -1,6 +1,6 @@
 ## Interface: 120001
 ## Title: Dundun Tracker
-## Notes: Tracks Shard of Dundun (weekly & total caps) across all characters on account.
+## Notes: Account-wide tracker for epic profession gear progress, Shard of Dundun caps, Fused Vitality and Unalloyed Abundance.
 ## Author: Parmenides-Khaz'goroth
 ## Version: @project-version@
 ## SavedVariables: DundunTrackerDB
