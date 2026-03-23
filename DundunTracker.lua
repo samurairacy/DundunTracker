@@ -164,13 +164,18 @@ local function ScanProfessionGear()
         end
     end
 
-    -- Determine which professions this character has with gear entries
+    -- Determine which Midnight-tier professions this character has.
+    -- table.pack preserves nil holes (ipairs stops at the first nil,
+    -- which would miss fishing/cooking at return positions 4 and 5).
+    -- skillLevel is the character's skill in the CURRENT expansion's tier;
+    -- 0 means they haven't unlocked Midnight for that profession yet.
     local charProfs = {}
-    local profIndexes = { GetProfessions() }
-    for _, profIndex in ipairs(profIndexes) do
+    local profs = table.pack(GetProfessions())
+    for i = 1, profs.n do
+        local profIndex = profs[i]
         if profIndex then
-            local _, _, _, _, _, _, skillLine = GetProfessionInfo(profIndex)
-            if skillLine and EPIC_PROF_GEAR[skillLine] then
+            local _, _, skillLevel, _, _, _, skillLine = GetProfessionInfo(profIndex)
+            if skillLine and EPIC_PROF_GEAR[skillLine] and skillLevel and skillLevel > 0 then
                 charProfs[skillLine] = true
             end
         end
@@ -189,8 +194,8 @@ local function ScanProfessionGear()
         end
     end
 
-    -- Scan bags 0-4
-    for bag = 0, 4 do
+    -- Scan bags 0-5 (5 = reagent bag, added in Dragonflight)
+    for bag = 0, 5 do
         local numSlots = C_Container.GetContainerNumSlots(bag)
         for slot = 1, numSlots do
             local info = C_Container.GetContainerItemInfo(bag, slot)
@@ -240,7 +245,7 @@ local function SaveCurrentChar()
 
     -- Scan bags for Fused Vitality (item ID 245345)
     local fusedVitality = 0
-    for bag = 0, 4 do
+    for bag = 0, 5 do
         local numSlots = C_Container.GetContainerNumSlots(bag)
         for slot = 1, numSlots do
             local slotInfo = C_Container.GetContainerItemInfo(bag, slot)
