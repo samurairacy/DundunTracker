@@ -652,7 +652,7 @@ local function CreateWindow()
 
     local titleText = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleText:SetPoint("CENTER")
-    titleText:SetText("|cffcc88ffShard of Dundun|r")
+    titleText:SetText("|cffcc88ffDundun Tracker|r")
 
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -7, -8)
