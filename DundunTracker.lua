@@ -1222,6 +1222,36 @@ local function CreateSettingsWindow()
     return f
 end
 
+-- Places subWin beside the main tracker window.
+-- Prefers the right side; falls back to the left; clamps to screen bounds.
+local function PositionBesideMainWindow(subWin)
+    if not window or not window:IsShown() then return end
+    local screenW = UIParent:GetWidth()
+    local screenH = UIParent:GetHeight()
+    local gap     = 8
+    local subW    = subWin:GetWidth()
+    local subH    = subWin:GetHeight()
+    local mainL   = window:GetLeft()
+    local mainR   = window:GetRight()
+    local mainT   = window:GetTop()  -- measured from screen bottom in WoW coords
+
+    -- Prefer right side; fall back to left; clamp if neither fits cleanly
+    local x
+    if mainR + gap + subW <= screenW then
+        x = mainR + gap
+    elseif mainL - gap - subW >= 0 then
+        x = mainL - gap - subW
+    else
+        x = math.max(0, math.min(screenW - subW, mainR + gap))
+    end
+
+    -- Align tops with main window; clamp so bottom stays on screen
+    local y = math.max(subH, math.min(screenH, mainT))
+
+    subWin:ClearAllPoints()
+    subWin:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+end
+
 ToggleSettingsWindow = function()
     if not settingsWindow then
         settingsWindow = CreateSettingsWindow()
@@ -1229,6 +1259,7 @@ ToggleSettingsWindow = function()
     if settingsWindow:IsShown() then
         settingsWindow:Hide()
     else
+        PositionBesideMainWindow(settingsWindow)
         RefreshSettingsWindow()
         settingsWindow:Show()
     end
@@ -1397,6 +1428,7 @@ ToggleHelpWindow = function()
     if helpWindow:IsShown() then
         helpWindow:Hide()
     else
+        PositionBesideMainWindow(helpWindow)
         helpWindow:Show()
     end
 end
