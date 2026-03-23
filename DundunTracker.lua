@@ -491,6 +491,7 @@ end
 
 local window
 local ToggleSettingsWindow  -- forward declaration; defined after CreateWindow
+local ToggleHelpWindow      -- forward declaration; defined after CreateWindow
 
 local function CreateRow(parent, index)
     local row = CreateFrame("Frame", nil, parent)
@@ -673,6 +674,23 @@ local function CreateWindow()
     gearLabel:SetPoint("CENTER")
     gearLabel:SetText("|cffaa88ccSettings|r")
     gearBtn:SetScript("OnClick", function() ToggleSettingsWindow() end)
+
+    -- Help button (? immediately left of Settings button)
+    local helpBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
+    helpBtn:SetSize(26, 20)
+    helpBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -92, 2)
+    helpBtn:SetBackdrop({
+        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 6,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    helpBtn:SetBackdropColor(0.12, 0.06, 0.20, 0.85)
+    helpBtn:SetBackdropBorderColor(0.45, 0.25, 0.65, 0.8)
+    local helpLabel = helpBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    helpLabel:SetPoint("CENTER")
+    helpLabel:SetText("|cffaa88cc?|r")
+    helpBtn:SetScript("OnClick", function() ToggleHelpWindow() end)
 
     -- Quote bar
     local TOP_OFFSET = 6 + TITLE_BAR_H + 4
@@ -1006,6 +1024,7 @@ end
 -- ============================================================
 
 local settingsWindow
+local helpWindow
 
 local function RefreshSettingsWindow()
     if not settingsWindow then return end
@@ -1212,6 +1231,173 @@ ToggleSettingsWindow = function()
     else
         RefreshSettingsWindow()
         settingsWindow:Show()
+    end
+end
+
+-- ============================================================
+--  Help window
+-- ============================================================
+
+local HELP_TEXT = [[|cffcc88ffWhat is DundunTracker?|r
+
+DundunTracker is an account-wide tracker for the Shard of Dundun currency and related progression systems in WoW Midnight. It automatically logs data for every character you log into, with no setup required. Open it with |cffFFFF00/dundun|r or |cffFFFF00/ddt|r, or click the minimap button.
+
+
+|cffcc88ffShard of Dundun — the two caps|r
+
+The Shard of Dundun has two caps to manage simultaneously:
+
+|cffffffff• Weekly (picked up)|r — how many fresh shards you can collect per weekly reset. Maximum 8.
+|cffffffff• Total (held)|r — how many shards you can hold at once. Maximum 8.
+
+If your total is full, you cannot pick up more shards even if your weekly cap isn't reached. You need to spend down your total first by exchanging shards at an Abundance event, then return to collect more before the weekly reset.
+
+Colour coding reflects fill level: grey = empty, orange = low, yellow = halfway or more, green = full.
+
+
+|cffcc88ffExpanded Info columns|r
+
+Four optional columns can be enabled via the checkboxes at the bottom of the window. Data is always collected in the background — the checkboxes only control what's displayed.
+
+|cffffffff• Primary Gear|r — tracks epic profession gear obtained for each character's primary professions, shown as X/Y (e.g. 3/6 means 3 out of 6 possible pieces obtained). Hover over a cell to see a full checklist of which specific items have and haven't been obtained yet.
+|cffffffff• Secondary Gear|r — same as above but for secondary professions (Cooking and Fishing). Hover for the full checklist.
+|cffffffff• Fused Vitality|r — shows how many Fused Vitality reagents the character is currently carrying. Fused Vitality is required to craft epic profession equipment.
+|cffffffff• Unalloyed Abundance|r — shows the character's current Unalloyed Abundance currency, earned by exchanging Shards of Dundun at active Abundance events.
+
+Note: gear detection scans equipped slots and bags only. Bank items are not detected unless the bank window is open at the time of the scan. Characters must log in at least once for their data to appear.
+
+
+|cffcc88ffAbundance event bar|r
+
+The bar between the quote and the column headers shows the currently active Abundance cave location and a live countdown to the next rotation. The event rotates every 8 hours among four cave locations across Eversong Woods, Zul'Aman, Harandar, and Voidstorm. The rotation order is random.
+
+Location is read directly from the WoW API and refreshes every 60 seconds. It may briefly show the previous location immediately after a rotation until the next refresh fires.
+
+
+|cffcc88ffSettings|r
+
+Click the Settings button in the title bar to open the settings window. From there you can set a Whitelist (show only selected characters) or Blacklist (hide selected characters) to control which characters appear in the tracker.
+
+
+|cffcc88ffCommands|r
+
+|cffFFFF00/dundun|r or |cffFFFF00/ddt|r — open and close the tracker
+|cffFFFF00/dundun debug|r — print raw currency data and DB state to chat
+
+
+|cffcc88ffCredits|r
+
+|cff888888Addon by Parmenides-Khaz'goroth — vibecoded using Claude Sonnet 4.6|r
+]]
+
+local function CreateHelpWindow()
+    local HW, HH = 460, 500
+    local f = CreateFrame("Frame", "DundunTrackerHelpWindow", UIParent, "BackdropTemplate")
+    f:SetSize(HW, HH)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("HIGH")
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop",  f.StopMovingOrSizing)
+    f:SetClampedToScreen(true)
+    f:SetResizable(true)
+    f:SetResizeBounds(320, 200)
+
+    f:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 24,
+        insets = { left = 6, right = 6, top = 6, bottom = 6 },
+    })
+    f:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
+    f:SetBackdropBorderColor(0.4, 0.35, 0.55, 1)
+
+    local titleBar = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",   8, -6)
+    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT",  -8, -6)
+    titleBar:SetHeight(TITLE_BAR_H)
+    titleBar:SetBackdrop({
+        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 10,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    titleBar:SetBackdropColor(0.18, 0.10, 0.30, 0.95)
+    titleBar:SetBackdropBorderColor(0.55, 0.30, 0.75, 1)
+
+    local titleText = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    titleText:SetPoint("CENTER")
+    titleText:SetText("|cffcc88ffDunDun Tracker - Help|r")
+
+    local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 4, 4)
+    closeBtn:SetScript("OnClick", function() f:Hide() end)
+
+    local SCROLL_TOP = 6 + TITLE_BAR_H + 8
+    local scrollFrame = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT",     f, "TOPLEFT",      10, -SCROLL_TOP)
+    scrollFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  -26, 10)
+
+    local content = CreateFrame("Frame", nil, scrollFrame)
+    content:SetWidth(HW - 36)
+    scrollFrame:SetScrollChild(content)
+
+    local textLabel = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    textLabel:SetPoint("TOPLEFT",  content, "TOPLEFT",   6, -6)
+    textLabel:SetPoint("TOPRIGHT", content, "TOPRIGHT",  -6, -6)
+    textLabel:SetJustifyH("LEFT")
+    textLabel:SetWordWrap(true)
+    textLabel:SetText(HELP_TEXT)
+
+    local function UpdateLayout()
+        local w = f:GetWidth() - 36
+        if w < 1 then return end
+        content:SetWidth(w)
+        C_Timer.After(0, function()
+            content:SetHeight(textLabel:GetStringHeight() + 16)
+        end)
+    end
+    f:SetScript("OnSizeChanged", UpdateLayout)
+
+    -- Resize grip
+    local function GripDot(xOff, yOff)
+        local d = f:CreateTexture(nil, "OVERLAY")
+        d:SetSize(2, 2)
+        d:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", xOff, yOff)
+        d:SetColorTexture(0.7, 0.5, 0.9, 0.8)
+    end
+    GripDot(-11, 3); GripDot(-7, 3);  GripDot(-3, 3)
+                     GripDot(-7, 7);  GripDot(-3, 7)
+                                      GripDot(-3, 11)
+
+    local gripFrame = CreateFrame("Frame", nil, f)
+    gripFrame:SetSize(18, 18)
+    gripFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    gripFrame:EnableMouse(true)
+    gripFrame:SetScript("OnMouseDown", function(self, btn)
+        if btn == "LeftButton" then f:StartSizing("BOTTOMRIGHT") end
+    end)
+    gripFrame:SetScript("OnMouseUp", function()
+        f:StopMovingOrSizing()
+    end)
+
+    tinsert(UISpecialFrames, "DundunTrackerHelpWindow")
+
+    UpdateLayout()
+    f:Hide()
+    return f
+end
+
+ToggleHelpWindow = function()
+    if not helpWindow then
+        helpWindow = CreateHelpWindow()
+    end
+    if helpWindow:IsShown() then
+        helpWindow:Hide()
+    else
+        helpWindow:Show()
     end
 end
 
