@@ -244,8 +244,18 @@ local function SaveCurrentChar()
         DundunTrackerDB._lastResetTime = GetServerTime()
     end
 
-    -- Scan profession gear
+    -- Scan profession gear.
+    -- At PLAYER_LEAVING_WORLD / PLAYER_LOGOUT, WoW tears down skill data
+    -- before firing the event, so GetProfessionInfo returns skillLevel = 0
+    -- and our Midnight filter rejects everything — charProfs comes back
+    -- empty. Guard against this: if the new scan found nothing but the
+    -- previous DB entry had profession data, keep the old snapshot.
     local charProfs, profGear = ScanProfessionGear()
+    if next(charProfs) == nil and prev and prev.professions
+            and next(prev.professions) ~= nil then
+        charProfs = prev.professions
+        profGear  = prev.profGear or {}
+    end
 
     -- Scan bags for Fused Vitality (item ID 245345)
     local fusedVitality = 0
