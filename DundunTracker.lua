@@ -258,9 +258,11 @@ local function SaveCurrentChar()
     end
 
     -- Scan bags for Fused Vitality (item ID 245345).
-    -- Same teardown caveat as profession gear: bags may be inaccessible at
-    -- PLAYER_LEAVING_WORLD, returning 0. Preserve the previous value when
-    -- the scan finds nothing but the character previously had some.
+    -- The backpack (bag 0) always has slots in a normal game state; if it
+    -- reports 0 or nil slots, WoW is tearing down container data and the
+    -- scan result is unreliable. In that case preserve the previous value
+    -- so a legitimate spend-to-zero is not confused with a failed scan.
+    local bagScanValid = (C_Container.GetContainerNumSlots(0) or 0) > 0
     local fusedVitality = 0
     for bag = 0, 5 do
         local numSlots = C_Container.GetContainerNumSlots(bag)
@@ -271,8 +273,8 @@ local function SaveCurrentChar()
             end
         end
     end
-    if fusedVitality == 0 and prev and (prev.fusedVitality or 0) > 0 then
-        fusedVitality = prev.fusedVitality
+    if not bagScanValid and prev then
+        fusedVitality = prev.fusedVitality or 0
     end
 
     -- Unalloyed Abundance currency (ID 3377)
