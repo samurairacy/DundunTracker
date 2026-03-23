@@ -5,6 +5,7 @@
 ## Version: @project-version@
 ## SavedVariables: DundunTrackerDB
 ## X-Curse-Project-ID: 1488331
+## X-Wago-ID: aNDMZ46o
 ## IconTexture: Interface\AddOns\DundunTracker\Media\dundun-small
 
 Libs\LibStub\LibStub.lua
