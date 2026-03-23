@@ -490,8 +490,11 @@ end
 -- ============================================================
 
 local window
-local ToggleSettingsWindow  -- forward declaration; defined after CreateWindow
-local ToggleHelpWindow      -- forward declaration; defined after CreateWindow
+local ToggleSettingsWindow      -- forward declaration; defined after CreateWindow
+local ToggleHelpWindow          -- forward declaration; defined after CreateWindow
+local DundunTracker_RefreshWindow  -- forward declaration; called from ticker callbacks
+local AutoSizeWindow               -- forward declaration; called from CreateWindow
+local DundunTrackerTicker
 
 local function CreateRow(parent, index)
     local row = CreateFrame("Frame", nil, parent)
@@ -872,7 +875,7 @@ end
 --  Populate rows
 -- ============================================================
 
-function DundunTracker_RefreshWindow()
+function DundunTracker_RefreshWindow()  -- assigned to local declared above
     if not window or not window:IsShown() then return end
     if not DundunTrackerDB then return end
 
@@ -1437,7 +1440,7 @@ end
 --  Show / Toggle
 -- ============================================================
 
-function AutoSizeWindow()
+function AutoSizeWindow()  -- assigned to local declared above
     if not DundunTrackerDB or not window then return end
     local count = 0
     for k, v in pairs(DundunTrackerDB) do
