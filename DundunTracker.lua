@@ -1134,7 +1134,7 @@ local function CreateSettingsWindow()
     titleText:SetText("|cffcc88ffDunDun Tracker - Settings|r")
 
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 4, 4)
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -8)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
     local INFO_TOP = 6 + TITLE_BAR_H + 10
@@ -1332,7 +1332,7 @@ local function CreateHelpWindow()
     titleText:SetText("|cffcc88ffDunDun Tracker - Help|r")
 
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 4, 4)
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -8)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
     local SCROLL_TOP = 6 + TITLE_BAR_H + 8
