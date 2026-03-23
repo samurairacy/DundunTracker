@@ -34,13 +34,13 @@ end
 --  Abundance event data
 -- ============================================================
 
--- poiKey = the suffix of the "Abundance: <X>" POI name in-game (may differ from the
--- display name). Confirmed from in-game observation; update others as they are seen.
+-- poiKey = the suffix of the "Abundance: <X>" POI name in-game.
+-- All four confirmed from the in-game Events schedule UI (March 2026).
 local ABUNDANCE_CAVES = {
-    { name = "Watha'nan Crypts",    zone = "Eversong Woods", mapID = 2395, poiKey = "Watha'nan Crypts" },
+    { name = "Watha'nan Crypts",    zone = "Eversong Woods", mapID = 2395, poiKey = "Enchanting Crypt" },
     { name = "Loaknit Den",         zone = "Zul'Aman",       mapID = 2437, poiKey = "Skinning Den" },
-    { name = "Floaret Grotto",      zone = "Harandar",       mapID = 2413, poiKey = "Floaret Grotto" },
-    { name = "Abundant Voidburrow", zone = "Voidstorm",      mapID = 2405, poiKey = "Abundant Voidburrow" },
+    { name = "Floaret Grotto",      zone = "Harandar",       mapID = 2413, poiKey = "Herbalism Grotto" },
+    { name = "Abundant Voidburrow", zone = "Voidstorm",      mapID = 2405, poiKey = "Mining Voidburrow" },
 }
 
 local abundanceCave       = nil  -- matched cave entry, or nil if unknown
