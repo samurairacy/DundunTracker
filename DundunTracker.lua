@@ -1382,6 +1382,24 @@ SlashCmdList["DUNDUN"] = function(msg)
             abundanceCave and abundanceCave.name or "nil",
             tostring(abundancePoiID),
             tostring(abundanceSubName)))
+        -- Force rescan and probe UpdateAbundanceBar
+        ScanAbundanceCave()
+        print(string.format("  After rescan: poiID=|cffFFFF00%s|r  cave=|cffFFFF00%s|r",
+            tostring(abundancePoiID),
+            abundanceCave and abundanceCave.name or "nil"))
+        print(string.format("  window=|cffFFFF00%s|r  abundanceText=|cffFFFF00%s|r  ticker=|cffFFFF00%s|r",
+            tostring(window ~= nil),
+            tostring(window ~= nil and window.abundanceText ~= nil),
+            tostring(abundanceTicker ~= nil)))
+        local ok, err = pcall(UpdateAbundanceBar)
+        if ok then
+            print("  UpdateAbundanceBar: |cff44FF44OK|r")
+        else
+            print("  UpdateAbundanceBar: |cffFF4444ERROR:|r " .. tostring(err))
+        end
+        if window and window.abundanceText then
+            print("  Bar text now: |cffFFFF00" .. (window.abundanceText:GetText() or "nil") .. "|r")
+        end
 
     elseif cmd == "debug" then
         local info = C_CurrencyInfo.GetCurrencyInfo(CURRENCY_ID)
