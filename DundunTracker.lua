@@ -1431,18 +1431,7 @@ SlashCmdList["DUNDUN"] = function(msg)
         if C_TradeSkillUI and C_TradeSkillUI.GetAllProfessionTradeSkillLines then
             local lines = C_TradeSkillUI.GetAllProfessionTradeSkillLines()
             if lines and #lines > 0 then
-                for _, lineID in ipairs(lines) do
-                    local info = C_TradeSkillUI.GetProfessionInfoBySkillLine(lineID)
-                    if info then
-                        print(string.format("  lineID=|cffFFFF00%d|r  name=|cffFFFF00%s|r  skillLevel=|cffFFFF00%s|r  maxSkillLevel=|cffFFFF00%s|r",
-                            lineID,
-                            tostring(info.professionName),
-                            tostring(info.skillLevel),
-                            tostring(info.maxSkillLevel)))
-                    else
-                        print(string.format("  lineID=|cffFFFF00%d|r  (GetProfessionInfoBySkillLine returned nil)", lineID))
-                    end
-                end
+                print("  lineIDs: " .. table.concat(lines, ", "))
             else
                 print("  (no lines returned)")
             end
