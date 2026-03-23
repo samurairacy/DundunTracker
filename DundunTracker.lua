@@ -655,13 +655,13 @@ local function CreateWindow()
     titleText:SetText("|cffcc88ffShard of Dundun|r")
 
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -8)
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -7, -8)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
     -- Settings button
     local gearBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
     gearBtn:SetSize(58, 20)
-    gearBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -38, -10)
+    gearBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -41, -10)
     gearBtn:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -678,7 +678,7 @@ local function CreateWindow()
     -- Help button (? immediately left of Settings button)
     local helpBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
     helpBtn:SetSize(26, 20)
-    helpBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -100, -10)
+    helpBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -103, -10)
     helpBtn:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -1134,7 +1134,7 @@ local function CreateSettingsWindow()
     titleText:SetText("|cffcc88ffDunDun Tracker - Settings|r")
 
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -8)
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -7, -8)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
     local INFO_TOP = 6 + TITLE_BAR_H + 10
@@ -1332,7 +1332,7 @@ local function CreateHelpWindow()
     titleText:SetText("|cffcc88ffDunDun Tracker - Help|r")
 
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -8)
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -7, -8)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
     local SCROLL_TOP = 6 + TITLE_BAR_H + 8
