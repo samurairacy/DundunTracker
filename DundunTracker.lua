@@ -165,21 +165,21 @@ local function ScanProfessionGear()
     end
 
     -- Determine which Midnight-tier professions this character has.
-    -- table.pack preserves nil holes (ipairs stops at the first nil,
-    -- which would miss fishing/cooking at return positions 4 and 5).
-    -- skillLevel is the character's skill in the CURRENT expansion's tier;
-    -- 0 means they haven't unlocked Midnight for that profession yet.
+    -- GetProfessions() returns up to 5 positional values (primary, primary,
+    -- archaeology, fishing, cooking); any can be nil. We unpack all five
+    -- explicitly to avoid ipairs/table.pack nil-hole issues.
+    -- skillLevel is the current expansion's tier skill; 0 means the character
+    -- hasn't started the Midnight tier for that profession yet.
     local charProfs = {}
-    local profs = table.pack(GetProfessions())
-    for i = 1, profs.n do
-        local profIndex = profs[i]
-        if profIndex then
-            local _, _, skillLevel, _, _, _, skillLine = GetProfessionInfo(profIndex)
-            if skillLine and EPIC_PROF_GEAR[skillLine] and skillLevel and skillLevel > 0 then
-                charProfs[skillLine] = true
-            end
+    local function tryProf(profIndex)
+        if not profIndex then return end
+        local _, _, skillLevel, _, _, _, skillLine = GetProfessionInfo(profIndex)
+        if skillLine and EPIC_PROF_GEAR[skillLine] and skillLevel and skillLevel > 0 then
+            charProfs[skillLine] = true
         end
     end
+    local p1, p2, p3, p4, p5 = GetProfessions()
+    tryProf(p1); tryProf(p2); tryProf(p3); tryProf(p4); tryProf(p5)
 
     -- Scan equipped slots 1-19
     local foundSets = {}
@@ -194,10 +194,12 @@ local function ScanProfessionGear()
         end
     end
 
-    -- Scan bags 0-5 (5 = reagent bag, added in Dragonflight)
+    -- Scan bags 0-5 (5 = reagent bag, added in Dragonflight).
+    -- Guard numSlots against nil: GetContainerNumSlots returns nil for
+    -- bag slots that don't exist, and "for i=1,nil" is a Lua error.
     for bag = 0, 5 do
         local numSlots = C_Container.GetContainerNumSlots(bag)
-        for slot = 1, numSlots do
+        for slot = 1, (numSlots or 0) do
             local info = C_Container.GetContainerItemInfo(bag, slot)
             if info and info.itemID and itemToSkillLine[info.itemID] then
                 local sl = itemToSkillLine[info.itemID]
@@ -247,7 +249,7 @@ local function SaveCurrentChar()
     local fusedVitality = 0
     for bag = 0, 5 do
         local numSlots = C_Container.GetContainerNumSlots(bag)
-        for slot = 1, numSlots do
+        for slot = 1, (numSlots or 0) do
             local slotInfo = C_Container.GetContainerItemInfo(bag, slot)
             if slotInfo and slotInfo.itemID == 245345 then
                 fusedVitality = fusedVitality + (slotInfo.stackCount or 1)
@@ -641,8 +643,11 @@ local function CreateWindow()
         local cb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
         cb:SetSize(20, 20)
         cb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", xOff, yOff)
+        cb:EnableKeyboard(false)  -- prevent checkbox from swallowing keyboard input
         cb.text:SetText(labelText)
         cb.text:SetTextColor(0.75, 0.70, 0.85)
+        -- Initialise from saved settings (CreateWindow is always called after ADDON_LOADED)
+        cb:SetChecked(GetSettings()[settingKey] and true or false)
         cb:SetScript("OnClick", function(self)
             GetSettings()[settingKey] = self:GetChecked() and true or false
             AutoSizeWindow()
@@ -655,14 +660,6 @@ local function CreateWindow()
     f.cb_secGear   = MakeCheckbox("Secondary Gear",      150, 36, "expandSecondaryGear")
     f.cb_fused     = MakeCheckbox("Fused Vitality",      8,   14, "expandFusedVitality")
     f.cb_unalloyed = MakeCheckbox("Unalloyed Abundance", 150, 14, "expandUnalloyed")
-
-    function f.RefreshCheckboxes()
-        local s = GetSettings()
-        f.cb_primGear:SetChecked(s.expandPrimaryGear   and true or false)
-        f.cb_secGear:SetChecked(s.expandSecondaryGear  and true or false)
-        f.cb_fused:SetChecked(s.expandFusedVitality    and true or false)
-        f.cb_unalloyed:SetChecked(s.expandUnalloyed    and true or false)
-    end
 
     -- Resize grip dots (bottom-right corner)
     local function GripDot(xOff, yOff)
@@ -1079,12 +1076,12 @@ local function ShowWindow()
     if not window then
         window = CreateWindow()
     end
-    window.RefreshCheckboxes()
     AutoSizeWindow()
     window.quoteText:SetText(GetNextQuote())
     SaveCurrentChar()
     window:Show()
-    DundunTracker_RefreshWindow()
+    -- Defer one frame so WoW's layout pass completes before we build rows.
+    C_Timer.After(0, DundunTracker_RefreshWindow)
 end
 
 local function ToggleWindow()
