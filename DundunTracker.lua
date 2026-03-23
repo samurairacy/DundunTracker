@@ -189,13 +189,16 @@ local function ScanProfessionGear()
     -- explicitly to avoid ipairs/table.pack nil-hole issues.
     -- skillLevel is the current expansion's tier skill; 0 means the character
     -- hasn't started the Midnight tier for that profession yet.
-    local charProfs = {}
+    local charProfs  = {}
+    local apiWorking = false  -- true if GetProfessionInfo returned usable data
     local function tryProf(profIndex)
         if not profIndex then return end
         -- Return value 11 is the expansion-prefixed tier name, e.g.
         -- "Midnight Alchemy" vs "Khaz Algar Alchemy" (Altoholic uses this
         -- same field; skillLevel alone cannot distinguish expansion tiers).
         local _, _, _, _, _, _, skillLine, _, _, _, currentLevelName = GetProfessionInfo(profIndex)
+        -- Any non-nil skillLine means the API is up and running.
+        if skillLine then apiWorking = true end
         if not (skillLine and EPIC_PROF_GEAR[skillLine]) then return end
         if currentLevelName and currentLevelName:find("Midnight") then
             charProfs[skillLine] = true
@@ -245,7 +248,7 @@ local function ScanProfessionGear()
         end
     end
 
-    return charProfs, profGear
+    return charProfs, profGear, apiWorking
 end
 
 local function SaveCurrentChar()
@@ -269,12 +272,13 @@ local function SaveCurrentChar()
 
     -- Scan profession gear.
     -- At PLAYER_LEAVING_WORLD / PLAYER_LOGOUT, WoW tears down skill data
-    -- before firing the event, so GetProfessionInfo returns skillLevel = 0
-    -- and our Midnight filter rejects everything — charProfs comes back
-    -- empty. Guard against this: if the new scan found nothing but the
-    -- previous DB entry had profession data, keep the old snapshot.
-    local charProfs, profGear = ScanProfessionGear()
-    if next(charProfs) == nil and prev and prev.professions
+    -- before firing the event, so GetProfessionInfo returns nil and
+    -- charProfs comes back empty. Fall back to the previous snapshot only
+    -- when the API itself was unavailable (apiWorking=false). If the API
+    -- worked but returned no Midnight professions, the character genuinely
+    -- has none and we should save empty — not restore stale data.
+    local charProfs, profGear, apiWorking = ScanProfessionGear()
+    if not apiWorking and prev and prev.professions
             and next(prev.professions) ~= nil then
         charProfs = prev.professions
         profGear  = prev.profGear or {}
