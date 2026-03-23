@@ -5,5 +5,11 @@
 ## Version: @project-version@
 ## SavedVariables: DundunTrackerDB
 ## X-Curse-Project-ID: 1488331
+## IconTexture: Interface\AddOns\DundunTracker\Media\dundun-small
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\lib.xml
 
 DundunTracker.lua
