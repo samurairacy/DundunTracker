@@ -181,13 +181,15 @@ local function ScanProfessionGear()
     local p1, p2, p3, p4, p5 = GetProfessions()
     tryProf(p1); tryProf(p2); tryProf(p3); tryProf(p4); tryProf(p5)
 
-    -- Scan equipped slots 1-19
+    -- Check profession equipment slots (Dragonflight+: tool and accessory
+    -- slots live in the profession window UI, NOT in the standard character
+    -- sheet slots 1-19). IsEquippedItem(itemID) scans every equipped slot
+    -- on the player, including the new profession equipment slots, so we
+    -- iterate the items we care about and ask WoW directly.
     local foundSets = {}
-    for slot = 1, 19 do
-        local itemID = GetInventoryItemID("player", slot)
-        if itemID and itemToSkillLine[itemID] then
-            local sl = itemToSkillLine[itemID]
-            if charProfs[sl] then
+    for sl in pairs(charProfs) do
+        for _, itemID in ipairs(EPIC_PROF_GEAR[sl]) do
+            if IsEquippedItem(itemID) then
                 if not foundSets[sl] then foundSets[sl] = {} end
                 foundSets[sl][itemID] = true
             end
