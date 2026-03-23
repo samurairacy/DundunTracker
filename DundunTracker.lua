@@ -31,6 +31,22 @@ local function GetNextQuote()
 end
 
 -- ============================================================
+--  Abundance event data
+-- ============================================================
+
+local ABUNDANCE_CAVES = {
+    { name = "Watha'nan Crypts",    zone = "Eversong Woods", mapID = 2395 },
+    { name = "Loaknit Den",         zone = "Zul'Aman",       mapID = 2437 },
+    { name = "Floaret Grotto",      zone = "Harandar",       mapID = 2413 },
+    { name = "Abundant Voidburrow", zone = "Voidstorm",      mapID = 2405 },
+}
+
+local abundanceCave       = nil  -- active cave entry, or nil if unknown
+local abundancePoiID      = nil  -- active POI ID for GetAreaPOISecondsLeft
+local abundanceTicker     = nil  -- 1-second countdown ticker (while window open)
+local abundanceScanTicker = nil  -- 60-second re-scan ticker
+
+-- ============================================================
 --  Profession gear data tables
 -- ============================================================
 
@@ -320,6 +336,58 @@ local function IsCharVisible(key)
 end
 
 -- ============================================================
+--  Abundance event detection
+-- ============================================================
+
+local function ScanAbundanceCave()
+    abundanceCave  = nil
+    abundancePoiID = nil
+    if not C_AreaPoiInfo then return end
+    for _, cave in ipairs(ABUNDANCE_CAVES) do
+        local pois = C_AreaPoiInfo.GetEventsForMap(cave.mapID)
+        if pois then
+            for _, poiID in ipairs(pois) do
+                local info = C_AreaPoiInfo.GetAreaPOIInfo(cave.mapID, poiID)
+                if info and info.name then
+                    local lname = info.name:lower()
+                    if lname:find("abundance") or lname == cave.name:lower() then
+                        if info.isCurrentEvent then
+                            abundanceCave  = cave
+                            abundancePoiID = poiID
+                            return
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function FormatCountdown(secs)
+    if not secs or secs <= 0 then return "ending soon" end
+    local h = math.floor(secs / 3600)
+    local m = math.floor((secs % 3600) / 60)
+    if h > 0 then
+        return string.format("%dh %dm remaining", h, m)
+    else
+        return string.format("%dm remaining", m)
+    end
+end
+
+local function UpdateAbundanceBar()
+    if not window or not window.abundanceText then return end
+    if not abundanceCave then
+        window.abundanceText:SetText("|cff888888Locating event...|r")
+        return
+    end
+    local secsLeft = abundancePoiID and C_AreaPoiInfo.GetAreaPOISecondsLeft(abundancePoiID)
+    local caveStr  = string.format("|cffcc88ff%s|r |cff888888(%s)|r",
+        abundanceCave.name, abundanceCave.zone)
+    local timeStr  = string.format("|cffFFFF00%s|r", FormatCountdown(secsLeft))
+    window.abundanceText:SetText(caveStr .. "  |cff555555||r  " .. timeStr)
+end
+
+-- ============================================================
 --  Layout constants
 -- ============================================================
 
@@ -334,6 +402,7 @@ local ROW_HEIGHT     = 22
 local HEADER_H       = 22
 local TITLE_BAR_H    = 26
 local QUOTE_H        = 24
+local ABUNDANCE_H    = 24
 local FOOTER_H       = 60
 local MIN_WIN_H      = 160
 local BASE_WIN_W     = COL_NAME + COL_WEEKLY + COL_TOTAL + 32
@@ -597,8 +666,36 @@ local function CreateWindow()
     quoteDivider:SetPoint("TOPLEFT",  quoteBar, "BOTTOMLEFT",  0, 0)
     quoteDivider:SetPoint("TOPRIGHT", quoteBar, "BOTTOMRIGHT", 0, 0)
 
+    -- Abundance info bar
+    local ABUND_TOP = TOP_OFFSET + QUOTE_H + 3
+    local abundBar = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    abundBar:SetPoint("TOPLEFT",  f, "TOPLEFT",   8, -ABUND_TOP)
+    abundBar:SetPoint("TOPRIGHT", f, "TOPRIGHT",  -8, -ABUND_TOP)
+    abundBar:SetHeight(ABUNDANCE_H)
+    abundBar:SetBackdrop({
+        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 8,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    abundBar:SetBackdropColor(0.08, 0.04, 0.14, 0.85)
+    abundBar:SetBackdropBorderColor(0.4, 0.2, 0.6, 0.7)
+
+    local abundText = abundBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    abundText:SetPoint("LEFT",  abundBar, "LEFT",   6, 0)
+    abundText:SetPoint("RIGHT", abundBar, "RIGHT", -6, 0)
+    abundText:SetJustifyH("CENTER")
+    abundText:SetText("|cff888888Locating event...|r")
+    f.abundanceText = abundText
+
+    local abundDivider = f:CreateTexture(nil, "ARTWORK")
+    abundDivider:SetColorTexture(0.4, 0.25, 0.6, 0.45)
+    abundDivider:SetHeight(1)
+    abundDivider:SetPoint("TOPLEFT",  abundBar, "BOTTOMLEFT",  0, 0)
+    abundDivider:SetPoint("TOPRIGHT", abundBar, "BOTTOMRIGHT", 0, 0)
+
     -- Column headers
-    local HEADER_TOP = TOP_OFFSET + QUOTE_H + 3
+    local HEADER_TOP = TOP_OFFSET + QUOTE_H + 3 + ABUNDANCE_H + 3
     local headerRow = CreateFrame("Frame", nil, f)
     headerRow:SetPoint("TOPLEFT",  f, "TOPLEFT",  8,  -HEADER_TOP)
     headerRow:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -HEADER_TOP)
@@ -701,6 +798,14 @@ local function CreateWindow()
     end)
     gripFrame:SetScript("OnMouseUp", function()
         f:StopMovingOrSizing()
+    end)
+
+    -- Stop countdown ticker when window is hidden
+    f:SetScript("OnHide", function()
+        if abundanceTicker then
+            abundanceTicker:Cancel()
+            abundanceTicker = nil
+        end
     end)
 
     -- ESC closes the window
@@ -1085,7 +1190,7 @@ function AutoSizeWindow()
         if type(v) == "table" and k:sub(1,1) ~= "_" and IsCharVisible(k) then count = count + 1 end
     end
     if count == 0 then return end
-    local scrollTop = (6 + TITLE_BAR_H + 4) + QUOTE_H + 3 + HEADER_H + 2
+    local scrollTop = (6 + TITLE_BAR_H + 4) + QUOTE_H + 3 + ABUNDANCE_H + 3 + HEADER_H + 2
     local idealH = scrollTop + FOOTER_H + (count * ROW_HEIGHT) + 8
     local w = GetWindowWidth()
     window:SetSize(w, math.max(idealH, MIN_WIN_H))
@@ -1100,6 +1205,11 @@ local function ShowWindow()
     window.quoteText:SetText(GetNextQuote())
     SaveCurrentChar()
     window:Show()
+    -- Start 1-second countdown ticker for the abundance bar.
+    if not abundanceTicker then
+        abundanceTicker = C_Timer.NewTicker(1, UpdateAbundanceBar)
+    end
+    UpdateAbundanceBar()
     -- Defer one frame so WoW's layout pass completes before we build rows.
     C_Timer.After(0, DundunTracker_RefreshWindow)
 end
@@ -1187,9 +1297,17 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         C_Timer.After(2, function()
             SaveCurrentChar()
             DundunTracker_RefreshWindow()
+            ScanAbundanceCave()
+            UpdateAbundanceBar()
         end)
         if not DundunTrackerTicker then
             DundunTrackerTicker = C_Timer.NewTicker(30, SaveCurrentChar)
+        end
+        if not abundanceScanTicker then
+            abundanceScanTicker = C_Timer.NewTicker(60, function()
+                ScanAbundanceCave()
+                UpdateAbundanceBar()
+            end)
         end
 
     elseif event == "CURRENCY_DISPLAY_UPDATE" then
