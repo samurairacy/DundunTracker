@@ -193,7 +193,11 @@ local function ScanProfessionGear()
     local function tryProf(profIndex)
         if not profIndex then return end
         local _, _, skillLevel, _, _, _, skillLine = GetProfessionInfo(profIndex)
-        if skillLine and EPIC_PROF_GEAR[skillLine] and skillLevel and skillLevel > 0 then
+        if not (skillLine and EPIC_PROF_GEAR[skillLine]) then return end
+        -- Secondary professions have no expansion tier so skillLevel may be 0
+        -- even when fully levelled; only gate on skillLevel > 0 for primaries.
+        local isSecondary = SECONDARY_PROFS[skillLine]
+        if isSecondary or (skillLevel and skillLevel > 0) then
             charProfs[skillLine] = true
         end
     end
@@ -1402,6 +1406,24 @@ SlashCmdList["DUNDUN"] = function(msg)
         end
         if window and window.abundanceText then
             print("  Bar text now: |cffFFFF00" .. (window.abundanceText:GetText() or "nil") .. "|r")
+        end
+
+    elseif cmd == "professions" then
+        print("|cffcc88ffDunDun Tracker:|r Profession info for current character:")
+        local p1, p2, p3, p4, p5 = GetProfessions()
+        local slots = { p1, p2, p3, p4, p5 }
+        local labels = { "Primary1", "Primary2", "Archaeology", "Fishing", "Cooking" }
+        for i, idx in ipairs(slots) do
+            if idx then
+                local name, _, skillLevel, maxSkillLevel, _, _, skillLine = GetProfessionInfo(idx)
+                print(string.format("  [%s] idx=|cffFFFF00%d|r  name=|cffFFFF00%s|r  skillLine=|cffFFFF00%s|r  skillLevel=|cffFFFF00%s|r  maxSkillLevel=|cffFFFF00%s|r  inGearTable=|cffFFFF00%s|r",
+                    labels[i], idx,
+                    tostring(name), tostring(skillLine),
+                    tostring(skillLevel), tostring(maxSkillLevel),
+                    tostring(EPIC_PROF_GEAR[skillLine] ~= nil)))
+            else
+                print(string.format("  [%s] not learned", labels[i]))
+            end
         end
 
     elseif cmd == "debug" then
