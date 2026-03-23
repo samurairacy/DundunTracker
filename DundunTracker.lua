@@ -394,9 +394,13 @@ local function FormatCountdown(secs)
 end
 
 local function UpdateAbundanceBar()
-    if not window or not window.abundanceText then return end
+    -- UpdateAbundanceBar is defined before `local window` (line 481), so the
+    -- upvalue `window` here would resolve to the WoW global (nil).  Look up
+    -- the frame by its registered name instead.
+    local f = DundunTrackerWindow
+    if not f or not f.abundanceText then return end
     if not abundancePoiID then
-        window.abundanceText:SetText("|cff888888Locating event...|r")
+        f.abundanceText:SetText("|cff888888Locating event...|r")
         return
     end
     local secsLeft = C_AreaPoiInfo.GetAreaPOISecondsLeft(abundancePoiID)
@@ -406,10 +410,9 @@ local function UpdateAbundanceBar()
         caveStr = string.format("|cffcc88ff%s|r |cff888888(%s)|r",
             abundanceCave.name, abundanceCave.zone)
     else
-        -- Known event, unknown cave mapping — show raw sub-name without zone
         caveStr = string.format("|cffcc88ff%s|r", abundanceSubName or "Unknown Cave")
     end
-    window.abundanceText:SetText(caveStr .. "  |cff555555||r  " .. timeStr)
+    f.abundanceText:SetText(caveStr .. "  |cff555555||r  " .. timeStr)
 end
 
 -- ============================================================
@@ -1388,8 +1391,8 @@ SlashCmdList["DUNDUN"] = function(msg)
             tostring(abundancePoiID),
             abundanceCave and abundanceCave.name or "nil"))
         print(string.format("  window=|cffFFFF00%s|r  abundanceText=|cffFFFF00%s|r  ticker=|cffFFFF00%s|r",
-            tostring(window ~= nil),
-            tostring(window ~= nil and window.abundanceText ~= nil),
+            tostring(DundunTrackerWindow ~= nil),
+            tostring(DundunTrackerWindow ~= nil and DundunTrackerWindow.abundanceText ~= nil),
             tostring(abundanceTicker ~= nil)))
         local ok, err = pcall(UpdateAbundanceBar)
         if ok then
