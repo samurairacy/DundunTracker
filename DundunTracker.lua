@@ -253,6 +253,18 @@ end
 
 local function SaveCurrentChar()
     if not DundunTrackerDB then return end
+
+    -- Only track characters at level 80 or above.  If a sub-80 character
+    -- somehow already has a saved entry (from before this check existed),
+    -- remove it now so the DB self-cleans the next time they log in.
+    if UnitLevel("player") < 80 then
+        local key = GetCharKey()
+        if DundunTrackerDB[key] then
+            DundunTrackerDB[key] = nil
+        end
+        return
+    end
+
     local info = C_CurrencyInfo.GetCurrencyInfo(CURRENCY_ID)
     if not info then return end
 
@@ -427,7 +439,8 @@ end
 --  Layout constants
 -- ============================================================
 
-local COL_NAME       = 210
+local COL_NAME       = 140
+local COL_REALM      = 110
 local COL_WEEKLY     = 115
 local COL_TOTAL      = 115
 local COL_PRIMGEAR   = 80
@@ -441,27 +454,93 @@ local QUOTE_H        = 24
 local ABUNDANCE_H    = 24
 local FOOTER_H       = 60
 local MIN_WIN_H      = 160
-local BASE_WIN_W     = COL_NAME + COL_WEEKLY + COL_TOTAL + 32
+-- Minimum column widths — used only to clamp proportional scaling so that
+-- no column becomes unreadably narrow.
+local MIN_COL_NAME      = 90
+local MIN_COL_REALM     = 70
+local MIN_COL_WEEKLY    = 85
+local MIN_COL_TOTAL     = 85
+local MIN_COL_PRIMGEAR  = 55
+local MIN_COL_SECGEAR   = 55
+local MIN_COL_FUSED     = 55
+local MIN_COL_UNALLOYED = 65
 
-local function GetWindowWidth()
-    local s = (DundunTrackerDB and DundunTrackerDB._settings) or {}
-    local w = BASE_WIN_W
-    if s.expandPrimaryGear   then w = w + COL_PRIMGEAR   end
-    if s.expandSecondaryGear then w = w + COL_SECGEAR    end
-    if s.expandFusedVitality then w = w + COL_FUSED      end
-    if s.expandUnalloyed     then w = w + COL_UNALLOYED  end
-    return w
-end
+-- The window always has this fixed width; hidden columns are redistributed
+-- proportionally among the visible ones rather than shrinking the window.
+local WIN_W = COL_NAME + COL_REALM + COL_WEEKLY + COL_TOTAL
+            + COL_PRIMGEAR + COL_SECGEAR + COL_FUSED + COL_UNALLOYED + 32
 
-local function GetExtraColumnOffsets()
+-- Returns: widths{}, offsets{}
+-- Visible columns are scaled proportionally to fill the window; each is
+-- clamped to its minimum via an iterative pass so no column becomes unreadable.
+local function ComputeColumnLayout()
     local s = (DundunTrackerDB and DundunTrackerDB._settings) or {}
-    local x = COL_NAME + COL_WEEKLY + COL_TOTAL
+    local available = WIN_W - 36   -- subtract scrollbar + left/right inset
+
+    -- Build ordered column list for the currently-enabled columns
+    local cols = {
+        { key = "name",  base = COL_NAME,  min = MIN_COL_NAME  },
+    }
+    if s.expandRealm then
+        table.insert(cols, { key = "realm", base = COL_REALM, min = MIN_COL_REALM })
+    end
+    table.insert(cols, { key = "weekly",    base = COL_WEEKLY,    min = MIN_COL_WEEKLY    })
+    table.insert(cols, { key = "total",     base = COL_TOTAL,     min = MIN_COL_TOTAL     })
+    if s.expandPrimaryGear   then table.insert(cols, { key = "primary",   base = COL_PRIMGEAR,  min = MIN_COL_PRIMGEAR  }) end
+    if s.expandSecondaryGear then table.insert(cols, { key = "secondary", base = COL_SECGEAR,   min = MIN_COL_SECGEAR   }) end
+    if s.expandFusedVitality then table.insert(cols, { key = "fused",     base = COL_FUSED,     min = MIN_COL_FUSED     }) end
+    if s.expandUnalloyed     then table.insert(cols, { key = "unalloyed", base = COL_UNALLOYED, min = MIN_COL_UNALLOYED }) end
+
+    -- Iterative proportional shrink: repeatedly fix columns that would fall
+    -- below their minimum and redistribute the freed space among the rest.
+    local widths  = {}
+    local freeAvail = available
+    local freeBase  = 0
+    for _, c in ipairs(cols) do freeBase = freeBase + c.base end
+
+    local clamped = {}
+    local changed = true
+    while changed do
+        changed = false
+        if freeBase <= 0 then break end
+        local factor = freeAvail / freeBase
+        for _, c in ipairs(cols) do
+            if not clamped[c.key] and c.base * factor < c.min then
+                clamped[c.key] = true
+                widths[c.key]  = c.min
+                freeAvail      = freeAvail - c.min
+                freeBase       = freeBase  - c.base
+                changed        = true
+            end
+        end
+    end
+
+    -- Apply final scale to the unclamped columns; fix rounding on the last one
+    local factor    = (freeBase > 0) and (freeAvail / freeBase) or 0
+    local allocated = 0
+    local lastKey   = nil
+    for _, c in ipairs(cols) do
+        if clamped[c.key] then
+            allocated = allocated + widths[c.key]
+        else
+            widths[c.key] = math.floor(c.base * factor)
+            allocated     = allocated + widths[c.key]
+            lastKey       = c.key
+        end
+    end
+    if lastKey then
+        widths[lastKey] = widths[lastKey] + (available - allocated)
+    end
+
+    -- Compute left-edge offsets from the widths
     local offsets = {}
-    if s.expandPrimaryGear   then offsets.primary   = x; x = x + COL_PRIMGEAR   end
-    if s.expandSecondaryGear then offsets.secondary = x; x = x + COL_SECGEAR    end
-    if s.expandFusedVitality then offsets.fused     = x; x = x + COL_FUSED      end
-    if s.expandUnalloyed     then offsets.unalloyed = x; x = x + COL_UNALLOYED  end
-    return offsets
+    local x = 0
+    for _, c in ipairs(cols) do
+        offsets[c.key] = x
+        x = x + widths[c.key]
+    end
+
+    return widths, offsets
 end
 
 -- ============================================================
@@ -512,13 +591,18 @@ local function CreateRow(parent, index)
     nameText:SetWordWrap(false)
     nameText:SetJustifyH("LEFT")
 
+    local realmText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    realmText:SetWidth(COL_REALM)
+    realmText:SetWordWrap(false)
+    realmText:SetJustifyH("LEFT")
+    realmText:SetTextColor(0.75, 0.70, 0.90)
+    realmText:Hide()
+
     local weeklyText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    weeklyText:SetPoint("LEFT", row, "LEFT", COL_NAME, 0)
     weeklyText:SetWidth(COL_WEEKLY)
     weeklyText:SetJustifyH("CENTER")
 
     local totalText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    totalText:SetPoint("LEFT", row, "LEFT", COL_NAME + COL_WEEKLY, 0)
     totalText:SetWidth(COL_TOTAL)
     totalText:SetJustifyH("CENTER")
 
@@ -605,6 +689,7 @@ local function CreateRow(parent, index)
     secGearHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     row.nameText      = nameText
+    row.realmText     = realmText
     row.weeklyText    = weeklyText
     row.totalText     = totalText
     row.primGearText  = primGearText
@@ -618,7 +703,7 @@ end
 
 local function CreateWindow()
     local f = CreateFrame("Frame", "DundunTrackerWindow", UIParent, "BackdropTemplate")
-    f:SetSize(GetWindowWidth(), 280)
+    f:SetSize(WIN_W, 280)
     f:SetPoint("CENTER")
     f:SetFrameStrata("MEDIUM")
     f:SetMovable(true)
@@ -627,8 +712,6 @@ local function CreateWindow()
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop",  f.StopMovingOrSizing)
     f:SetClampedToScreen(true)
-    f:SetResizable(true)
-    f:SetResizeBounds(BASE_WIN_W, MIN_WIN_H)
 
     f:SetBackdrop({
         bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -751,12 +834,19 @@ local function CreateWindow()
     abundDivider:SetPoint("TOPLEFT",  abundBar, "BOTTOMLEFT",  0, 0)
     abundDivider:SetPoint("TOPRIGHT", abundBar, "BOTTOMRIGHT", 0, 0)
 
-    -- Column headers
+    -- Column headers — wrapped in a ScrollFrame so that when the window is
+    -- narrower than the minimum total column width the header cells clip cleanly
+    -- and scroll in sync with the horizontal scroll bar.
     local HEADER_TOP = TOP_OFFSET + QUOTE_H + 3 + ABUNDANCE_H + 3
-    local headerRow = CreateFrame("Frame", nil, f)
-    headerRow:SetPoint("TOPLEFT",  f, "TOPLEFT",  8,  -HEADER_TOP)
-    headerRow:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -HEADER_TOP)
+    local headerScrollFrame = CreateFrame("ScrollFrame", nil, f)
+    headerScrollFrame:SetPoint("TOPLEFT",  f, "TOPLEFT",   8,  -HEADER_TOP)
+    headerScrollFrame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -HEADER_TOP)
+    headerScrollFrame:SetHeight(HEADER_H)
+    f.headerScrollFrame = headerScrollFrame
+
+    local headerRow = CreateFrame("Frame", nil, headerScrollFrame)
     headerRow:SetHeight(HEADER_H)
+    headerScrollFrame:SetScrollChild(headerRow)
     f.headerRow = headerRow
 
     local function FixedHeaderCell(text, x, w)
@@ -766,10 +856,9 @@ local function CreateWindow()
         fs:SetJustifyH("CENTER")
         fs:SetText(text)
         fs:SetTextColor(0.9, 0.8, 0.5)
+        return fs
     end
-    FixedHeaderCell("Character",       0,                     COL_NAME)
-    FixedHeaderCell("Weekly (picked)", COL_NAME,              COL_WEEKLY)
-    FixedHeaderCell("Total (held)",    COL_NAME + COL_WEEKLY, COL_TOTAL)
+    f.hdrName = FixedHeaderCell("Character", 0, COL_NAME)
 
     local function ExtraHeaderCell(text, w)
         local fs = headerRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -780,25 +869,28 @@ local function CreateWindow()
         fs:Hide()
         return fs
     end
-    f.hdrPrimGear  = ExtraHeaderCell("Prim Gear",  COL_PRIMGEAR)
-    f.hdrSecGear   = ExtraHeaderCell("Sec Gear",   COL_SECGEAR)
-    f.hdrFused     = ExtraHeaderCell("Fused Vit",  COL_FUSED)
-    f.hdrUnalloyed = ExtraHeaderCell("Unalloyed",  COL_UNALLOYED)
+    f.hdrRealm     = ExtraHeaderCell("Realm",           COL_REALM)
+    f.hdrWeekly    = ExtraHeaderCell("Weekly (picked)", COL_WEEKLY)
+    f.hdrTotal     = ExtraHeaderCell("Total (held)",    COL_TOTAL)
+    f.hdrPrimGear  = ExtraHeaderCell("Prim Gear",       COL_PRIMGEAR)
+    f.hdrSecGear   = ExtraHeaderCell("Sec Gear",        COL_SECGEAR)
+    f.hdrFused     = ExtraHeaderCell("Fused Vit",       COL_FUSED)
+    f.hdrUnalloyed = ExtraHeaderCell("Unalloyed",       COL_UNALLOYED)
 
     local headerDivider = f:CreateTexture(nil, "ARTWORK")
     headerDivider:SetColorTexture(0.5, 0.4, 0.7, 0.5)
     headerDivider:SetHeight(1)
-    headerDivider:SetPoint("TOPLEFT",  headerRow, "BOTTOMLEFT",  0, 0)
-    headerDivider:SetPoint("TOPRIGHT", headerRow, "BOTTOMRIGHT", 0, 0)
+    headerDivider:SetPoint("TOPLEFT",  headerScrollFrame, "BOTTOMLEFT",  0, 0)
+    headerDivider:SetPoint("TOPRIGHT", headerScrollFrame, "BOTTOMRIGHT", 0, 0)
 
-    -- Scroll frame
+    -- Scroll frame (vertical)
     local SCROLL_TOP = HEADER_TOP + HEADER_H + 2
     local scrollFrame = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT",     f, "TOPLEFT",      8,   -SCROLL_TOP)
-    scrollFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   FOOTER_H)
+    scrollFrame:SetPoint("TOPLEFT",     f, "TOPLEFT",      8,  -SCROLL_TOP)
+    scrollFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,  FOOTER_H)
 
     local content = CreateFrame("Frame", nil, scrollFrame)
-    content:SetSize(GetWindowWidth() - 36, 1)
+    content:SetSize(WIN_W - 36, 1)
     content.rows = {}
     scrollFrame:SetScrollChild(content)
 
@@ -830,32 +922,11 @@ local function CreateWindow()
         return cb
     end
 
+    f.cb_realm     = MakeCheckbox("Realm",               290, 36, "expandRealm")
     f.cb_primGear  = MakeCheckbox("Primary Gear",        8,   36, "expandPrimaryGear")
     f.cb_secGear   = MakeCheckbox("Secondary Gear",      150, 36, "expandSecondaryGear")
     f.cb_fused     = MakeCheckbox("Fused Vitality",      8,   14, "expandFusedVitality")
     f.cb_unalloyed = MakeCheckbox("Unalloyed Abundance", 150, 14, "expandUnalloyed")
-
-    -- Resize grip dots (bottom-right corner)
-    local function GripDot(xOff, yOff)
-        local d = f:CreateTexture(nil, "OVERLAY")
-        d:SetSize(2, 2)
-        d:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", xOff, yOff)
-        d:SetColorTexture(0.7, 0.5, 0.9, 0.8)
-    end
-    GripDot(-11, 3); GripDot(-7, 3);  GripDot(-3, 3)
-                     GripDot(-7, 7);  GripDot(-3, 7)
-                                      GripDot(-3, 11)
-
-    local gripFrame = CreateFrame("Frame", nil, f)
-    gripFrame:SetSize(18, 18)
-    gripFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
-    gripFrame:EnableMouse(true)
-    gripFrame:SetScript("OnMouseDown", function(self, btn)
-        if btn == "LeftButton" then f:StartSizing("BOTTOMRIGHT") end
-    end)
-    gripFrame:SetScript("OnMouseUp", function()
-        f:StopMovingOrSizing()
-    end)
 
     -- Stop countdown ticker when window is hidden
     f:SetScript("OnHide", function()
@@ -897,22 +968,34 @@ function DundunTracker_RefreshWindow()  -- assigned to local declared above
     end)
 
     local content = window.content
-    local offsets = GetExtraColumnOffsets()
 
-    -- Update extra column headers
-    local function RefreshHeader(hdr, offset)
+    -- Compute proportional column widths for the visible columns
+    local widths, offsets = ComputeColumnLayout()
+    local contentWidth = WIN_W - 36
+
+    -- Set content and headerRow to the computed width so rows stretch correctly
+    content:SetWidth(contentWidth)
+    window.headerRow:SetWidth(contentWidth)
+
+    -- Update header cell widths and positions
+    window.hdrName:SetSize(widths.name, HEADER_H)
+    local function RefreshHeader(hdr, offset, width)
         if offset then
             hdr:ClearAllPoints()
             hdr:SetPoint("TOPLEFT", window.headerRow, "TOPLEFT", offset, 0)
+            hdr:SetSize(width, HEADER_H)
             hdr:Show()
         else
             hdr:Hide()
         end
     end
-    RefreshHeader(window.hdrPrimGear,  offsets.primary)
-    RefreshHeader(window.hdrSecGear,   offsets.secondary)
-    RefreshHeader(window.hdrFused,     offsets.fused)
-    RefreshHeader(window.hdrUnalloyed, offsets.unalloyed)
+    RefreshHeader(window.hdrRealm,     offsets.realm,     widths.realm)
+    RefreshHeader(window.hdrWeekly,    offsets.weekly,    widths.weekly)
+    RefreshHeader(window.hdrTotal,     offsets.total,     widths.total)
+    RefreshHeader(window.hdrPrimGear,  offsets.primary,   widths.primary)
+    RefreshHeader(window.hdrSecGear,   offsets.secondary, widths.secondary)
+    RefreshHeader(window.hdrFused,     offsets.fused,     widths.fused)
+    RefreshHeader(window.hdrUnalloyed, offsets.unalloyed, widths.unalloyed)
 
     for i = #sorted + 1, #content.rows do
         content.rows[i]:Hide()
@@ -928,9 +1011,24 @@ function DundunTracker_RefreshWindow()  -- assigned to local declared above
         local d = entry.data
         local isCurrent = (entry.key == currentKey)
         local prefix = isCurrent and "|cffFFFFFF>|r " or "  "
-        local nameLabel = (d.name or "?") .. (d.realm and ("-" .. d.realm) or "")
-        row.nameText:SetText(prefix .. ClassColor(d.class or "") .. nameLabel .. "|r")
+        row.nameText:SetWidth(widths.name - 6)
+        row.nameText:SetText(prefix .. ClassColor(d.class or "") .. (d.name or "?") .. "|r")
 
+        -- Realm column
+        if offsets.realm then
+            row.realmText:ClearAllPoints()
+            row.realmText:SetPoint("LEFT", row, "LEFT", offsets.realm, 0)
+            row.realmText:SetWidth(widths.realm)
+            row.realmText:SetText(d.realm or "|cff888888-|r")
+            row.realmText:Show()
+        else
+            row.realmText:Hide()
+        end
+
+        -- Weekly column (reposition based on realm visibility)
+        row.weeklyText:ClearAllPoints()
+        row.weeklyText:SetPoint("LEFT", row, "LEFT", offsets.weekly, 0)
+        row.weeklyText:SetWidth(widths.weekly)
         local stale = not isCurrent
                       and d.lastSaved
                       and d.lastSaved < weekStart
@@ -940,6 +1038,10 @@ function DundunTracker_RefreshWindow()  -- assigned to local declared above
         row.weeklyText:SetText(string.format("|cff%02x%02x%02x%d / %d|r",
             wr*255, wg*255, wb*255, we, wc))
 
+        -- Total column (reposition based on realm visibility)
+        row.totalText:ClearAllPoints()
+        row.totalText:SetPoint("LEFT", row, "LEFT", offsets.total, 0)
+        row.totalText:SetWidth(widths.total)
         local qty = d.quantity or 0
         local tc  = d.totalCap or TOTAL_CAP
         local tr, tg, tb = FractionColor(qty, tc)
@@ -950,6 +1052,7 @@ function DundunTracker_RefreshWindow()  -- assigned to local declared above
         if offsets.primary then
             row.primGearText:ClearAllPoints()
             row.primGearText:SetPoint("LEFT", row, "LEFT", offsets.primary, 0)
+            row.primGearText:SetWidth(widths.primary)
             row.primGearHit:ClearAllPoints()
             row.primGearHit:SetPoint("TOPLEFT", row, "TOPLEFT", offsets.primary, 0)
             row.primGearHit.charData = d
@@ -972,6 +1075,7 @@ function DundunTracker_RefreshWindow()  -- assigned to local declared above
         if offsets.secondary then
             row.secGearText:ClearAllPoints()
             row.secGearText:SetPoint("LEFT", row, "LEFT", offsets.secondary, 0)
+            row.secGearText:SetWidth(widths.secondary)
             row.secGearHit:ClearAllPoints()
             row.secGearHit:SetPoint("TOPLEFT", row, "TOPLEFT", offsets.secondary, 0)
             row.secGearHit.charData = d
@@ -994,6 +1098,7 @@ function DundunTracker_RefreshWindow()  -- assigned to local declared above
         if offsets.fused then
             row.fusedText:ClearAllPoints()
             row.fusedText:SetPoint("LEFT", row, "LEFT", offsets.fused, 0)
+            row.fusedText:SetWidth(widths.fused)
             if d.fusedVitality ~= nil then
                 row.fusedText:SetText(tostring(d.fusedVitality))
             else
@@ -1008,6 +1113,7 @@ function DundunTracker_RefreshWindow()  -- assigned to local declared above
         if offsets.unalloyed then
             row.unalloyedText:ClearAllPoints()
             row.unalloyedText:SetPoint("LEFT", row, "LEFT", offsets.unalloyed, 0)
+            row.unalloyedText:SetWidth(widths.unalloyed)
             if d.unalloyedAbundance ~= nil then
                 row.unalloyedText:SetText(tostring(d.unalloyedAbundance))
             else
@@ -1411,10 +1517,14 @@ local function CreateHelpWindow()
     gripFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
     gripFrame:EnableMouse(true)
     gripFrame:SetScript("OnMouseDown", function(self, btn)
-        if btn == "LeftButton" then f:StartSizing("BOTTOMRIGHT") end
+        if btn == "LeftButton" then
+            f:SetMovable(false)   -- prevent OnDragStart/StartMoving from firing during resize
+            f:StartSizing("BOTTOMRIGHT")
+        end
     end)
     gripFrame:SetScript("OnMouseUp", function()
         f:StopMovingOrSizing()
+        f:SetMovable(true)
     end)
 
     tinsert(UISpecialFrames, "DundunTrackerHelpWindow")
@@ -1449,9 +1559,8 @@ function AutoSizeWindow()  -- assigned to local declared above
     if count == 0 then return end
     local scrollTop = (6 + TITLE_BAR_H + 4) + QUOTE_H + 3 + ABUNDANCE_H + 3 + HEADER_H + 2
     local idealH = scrollTop + FOOTER_H + (count * ROW_HEIGHT) + 8
-    local w = GetWindowWidth()
-    window:SetSize(w, math.max(idealH, MIN_WIN_H))
-    window.content:SetSize(w - 36, 1)
+    window:SetSize(WIN_W, math.max(idealH, MIN_WIN_H))
+    window.content:SetSize(WIN_W - 36, 1)
 end
 
 local function ShowWindow()
