@@ -170,6 +170,9 @@ local function FractionColor(val, cap)
     end
 end
 
+local ldb
+local UpdateLDBText
+
 -- ============================================================
 --  Data write
 -- ============================================================
@@ -262,6 +265,7 @@ local function SaveCurrentChar()
         if DundunTrackerDB[key] then
             DundunTrackerDB[key] = nil
         end
+        if UpdateLDBText then UpdateLDBText() end
         return
     end
 
@@ -334,6 +338,8 @@ local function SaveCurrentChar()
         fusedVitality      = fusedVitality,
         unalloyedAbundance = unalloyedAbundance,
     }
+
+    if UpdateLDBText then UpdateLDBText() end
 end
 
 -- ============================================================
@@ -1592,10 +1598,43 @@ end
 --  Minimap button (LibDBIcon)
 -- ============================================================
 
-local ldb = LibStub("LibDataBroker-1.1"):NewDataObject("DundunTracker", {
+local function GetBrokerWeeklyProgress(charData)
+    local weeklyEarned = charData and (charData.weeklyEarned or 0) or 0
+    local weeklyCap    = charData and (charData.weeklyCap or WEEKLY_CAP) or WEEKLY_CAP
+    if charData and charData.lastSaved then
+        local nextReset = GetServerTime() + C_DateAndTime.GetSecondsUntilWeeklyReset()
+        local weekStart = nextReset - (7 * 24 * 3600)
+        if charData.lastSaved < weekStart then
+            weeklyEarned = 0
+        end
+    end
+    return weeklyEarned, weeklyCap
+end
+
+local function FormatBrokerFraction(value, cap)
+    local r, g, b = FractionColor(value, cap)
+    return string.format("|cff%02x%02x%02x%d/%d|r",
+        r * 255, g * 255, b * 255, value, cap)
+end
+
+UpdateLDBText = function()
+    if not ldb then return end
+
+    local charData                 = DundunTrackerDB and DundunTrackerDB[GetCharKey()]
+    local weeklyEarned, weeklyCap  = GetBrokerWeeklyProgress(charData)
+    local quantity                 = charData and (charData.quantity or 0) or 0
+    local totalCap                 = charData and (charData.totalCap or TOTAL_CAP) or TOTAL_CAP
+
+    ldb.text = FormatBrokerFraction(weeklyEarned, weeklyCap)
+        .. " |cffc0c0c0-|r "
+        .. FormatBrokerFraction(quantity, totalCap)
+end
+
+ldb = LibStub("LibDataBroker-1.1"):NewDataObject("DundunTracker", {
     type  = "data source",
     icon  = "Interface\\AddOns\\DundunTracker\\Media\\dundun-small",
     label = "DunDun Tracker",
+    text  = "|cff9999990/8|r |cffc0c0c0-|r |cff9999990/8|r",
     OnClick = function(_, btn)
         if btn == "RightButton" then
             ToggleSettingsWindow()
@@ -1645,6 +1684,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if s.expandUnalloyed     == nil then s.expandUnalloyed     = false end
 
         RegisterMinimapButton()
+        UpdateLDBText()
 
         local count = 0
         for k, v in pairs(DundunTrackerDB) do
