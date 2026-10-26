@@ -212,13 +212,13 @@ local function ScanProfessionGear()
 
     -- Check profession equipment slots (Dragonflight+: tool and accessory
     -- slots live in the profession window UI, NOT in the standard character
-    -- sheet slots 1-19). IsEquippedItem(itemID) scans every equipped slot
+    -- sheet slots 1-19). C_Item.IsEquippedItem(itemID) scans every equipped slot
     -- on the player, including the new profession equipment slots, so we
     -- iterate the items we care about and ask WoW directly.
     local foundSets = {}
     for sl in pairs(charProfs) do
         for _, itemID in ipairs(EPIC_PROF_GEAR[sl]) do
-            if IsEquippedItem(itemID) then
+            if C_Item.IsEquippedItem(itemID) then
                 if not foundSets[sl] then foundSets[sl] = {} end
                 foundSets[sl][itemID] = true
             end
